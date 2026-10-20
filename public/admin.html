@@ -158,14 +158,6 @@ function t(key, options) {
 // Make t function globally accessible
 window.t = t;
 
-// Initialize i18n
-let i18nReady = false;
-initI18n().then(() => {
-  i18nReady = true;
-  // Call initial render after i18n is ready
-  if (typeof render === 'function') render();
-});
-
 // Language toggle handler
 document.addEventListener('DOMContentLoaded', () => {
   const langToggle = document.getElementById('langToggle');
@@ -340,6 +332,15 @@ async function render(){
   const ab=h('button',{},window.t('advanced.add'));ab.onclick=()=>busy(ab,'…',()=>api('PUT','/providers/'+cn.value.trim().toLowerCase(),{baseUrl:cu.value,defaultModel:cm.value}));
   app.append(h('details',{class:'card'},h('summary',{},window.t('advanced.title')),h('div',{class:'row'},cn,cu,cm,ab)));
 }
+
+// Initialize i18n and render
+let i18nReady = false;
+initI18n().then(() => {
+  i18nReady = true;
+  // Call initial render after i18n is ready
+  render();
+});
+
 // Initial render will be called after i18n is ready
 setInterval(()=>{if(S&&S.providers.some(p=>p.scanning)&&!document.activeElement?.matches('textarea,input,select'))render()},5000);
 </script>
