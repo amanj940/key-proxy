@@ -88,7 +88,7 @@ code{direction:ltr;unicode-bidi:embed;word-break:break-all;font-family:ui-monosp
 <div class="wrap">
   <div class="top">
     <div class="logo">🔑</div>
-    <h1 id="title">Key Proxy<small id="subtitle">Provider keys in one place · Auto rotation · OpenAI interface</small></h1>
+    <h1 id="title">Key Proxy<small id="subtitle">Loading...</small></h1>
     <button id="langToggle" class="ghost sm" style="margin-left:auto">🇺🇸</button>
     <span id="scan"></span>
   </div>
@@ -135,6 +135,14 @@ function updateLanguage(lang) {
     langToggle.textContent = lang === 'ar' ? '🇸🇦' : '🇺🇸';
   }
   
+  // Update title and subtitle
+  const title = document.getElementById('title');
+  const subtitle = document.getElementById('subtitle');
+  if (title && subtitle && i18next.isInitialized) {
+    title.textContent = i18next.t('admin.title');
+    subtitle.textContent = i18next.t('admin.subtitle');
+  }
+  
   // Save preference
   localStorage.setItem('keyproxy-lang', lang);
   
@@ -143,6 +151,7 @@ function updateLanguage(lang) {
 }
 
 function t(key, options) {
+  if (!i18next.isInitialized) return key;
   return i18next.t(key, options);
 }
 
@@ -150,7 +159,9 @@ function t(key, options) {
 window.t = t;
 
 // Initialize i18n
+let i18nReady = false;
 initI18n().then(() => {
+  i18nReady = true;
   // Call initial render after i18n is ready
   if (typeof render === 'function') render();
 });
@@ -241,14 +252,14 @@ function modelsTab(p){
   if(p.defaultModel&&!opts.some(([id])=>id===p.defaultModel))opts.unshift([p.defaultModel,p.defaultModel+' (untested)']);
   const sel=h('select',{},h('option',{value:''},'— '+window.t('provider.selectDefault')+' —'),
     ...opts.map(([id,t])=>h('option',{value:id,selected:id===p.defaultModel},t)));
-  sel.onchange=async()=>{const v=sel.value;try{await api('PUT','/providers/'+p.name,{defaultModel:v});toast(v?window.t('toasts.defaultSet',{model:v}):window.t('toasts.defaultUnset'),'ok')}catch(e){toast(e.message,'bad')}render()};
+  sel.onchange=async()=>{const v=sel.value;try{await api('PUT','/providers/'+p.name,{defaultModel:v});toast(v?window.t('toasts.defaultSet',{model:v}):window.t('toasts.defaultUnset'),'ok')}catch(e){toast(e.message,'bad')}render();};
   const rs=h('button',{class:'ghost'},p.scanning?window.t('provider.scanning'):window.t('provider.rescan'));rs.disabled=!!p.scanning;
   rs.onclick=()=>busy(rs,'…',()=>api('POST',`/providers/${p.name}/rescan`),()=>window.t('toasts.scanStarted'));
   const row=([id,m])=>{
     const cb=h('input',{type:'checkbox',checked:m.enabled!==false});cb.onchange=()=>api('POST',`/providers/${p.name}/models/set`,{id,enabled:cb.checked});
     return h('div',{class:'item'},h('i',{class:'dot '+st(m)}),h('code',{},id),h('span',{class:'tag'},m.type),h('span',{class:'grow'},m.err||''),h('label',{class:'sw'},cb,h('i')));
   };
-  const when=p.scannedAt?window.t('provider.lastScan')+': '+new Date(p.scannedAt).toLocaleString('en'):window.t('provider.notScanned');
+  const when=p.scannedAt?window.t('provider.lastScan')+': '+new Date(p.scannedAt).toLocaleString(document.documentElement.lang):window.t('provider.notScanned');
   return h('div',{},h('div',{class:'row'},sel,rs),
     p.note?h('div',{class:'chip unknown'},'⚠️ '+p.note):null,
     h('p',{class:'mut',style:'font-size:12.5px;margin:4px 0'},(p.scanning?window.t('provider.autoScanning')+' ':window.t(''))+when+(p.locked?' · '+window.t('provider.defaultPinned'):'')),
