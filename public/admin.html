@@ -139,7 +139,7 @@ function updateLanguage(lang) {
   const title = document.getElementById('title');
   const subtitle = document.getElementById('subtitle');
   if (title && subtitle && i18next.isInitialized) {
-    title.textContent = i18next.t('admin.title');
+    if (title.firstChild) title.firstChild.textContent = i18next.t('admin.title');
     subtitle.textContent = i18next.t('admin.subtitle');
   }
   
@@ -294,8 +294,10 @@ async function render(){
   const sc=h('button',{},'⚡ '+window.t('fullScan'));sc.onclick=()=>fullScan(sc);$('#scan').replaceChildren(sc);
   
   // Update title and subtitle
-  $('#title').firstChild.textContent = window.t('admin.title');
-  $('#subtitle').textContent = window.t('admin.subtitle');
+  const titleEl = $('#title');
+  const subtitleEl = $('#subtitle');
+  if (titleEl && titleEl.firstChild) titleEl.firstChild.textContent = window.t('admin.title');
+  if (subtitleEl) subtitleEl.textContent = window.t('admin.subtitle');
 
   const ta=h('textarea',{placeholder:window.t('addProviderKeys.placeholder')});
   ta.ondragover=(e)=>{e.preventDefault();ta.classList.add('drag')};ta.ondragleave=()=>ta.classList.remove('drag');
