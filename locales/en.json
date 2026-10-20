@@ -1,0 +1,106 @@
+{
+  "translation": {
+    "admin": {
+      "title": "Key Proxy",
+      "subtitle": "Provider keys in one place · Auto rotation · OpenAI interface"
+    },
+    "tiles": {
+      "activeKeys": "Active keys",
+      "providers": "Providers",
+      "validModels": "Valid models"
+    },
+    "fullScan": "Full scan",
+    "addProviderKeys": {
+      "title": "Add provider keys",
+      "subtitle": "One box for all providers. Provider is auto-detected and each key is verified before saving.",
+      "placeholder": "Paste keys from any provider (one key per line) or copy a full .env file, or drag and drop file here",
+      "button": "Detect and add"
+    },
+    "chips": {
+      "added": "Key verified",
+      "addedNotVerified": "Added but not verified yet, will verify when scanning models",
+      "duplicate": "already exists",
+      "invalid": "rejected by",
+      "notSaved": "and not saved",
+      "unknown": "provider unknown and not accepted by any of your providers. Add provider from \"Advanced\" then paste again"
+    },
+    "projectKeys": {
+      "title": "Project keys",
+      "subtitle": "Give each project its own key instead of provider keys. If leaked, just delete it.",
+      "placeholder": "Project name",
+      "button": "Create key",
+      "copyNow": "Copy the key now, it will not appear again",
+      "copy": "Copy",
+      "toConnect": "To connect in any project:",
+      "name": "Name",
+      "key": "Key",
+      "requests": "Requests",
+      "delete": "Delete",
+      "deleteConfirm": "Delete this key?"
+    },
+    "providers": {
+      "title": "Providers",
+      "subtitle": "Open any provider to manage its keys and models.",
+      "noKeys": "No keys yet. Paste them above.",
+      "withoutKeys": "Providers without keys",
+      "invalid": "invalid",
+      "noCredit": "no credit",
+      "keys": "keys",
+      "workingModel": "working model",
+      "notScanned": "not scanned"
+    },
+    "advanced": {
+      "title": "Advanced: Add another OpenAI-compatible provider",
+      "name": "name",
+      "baseUrl": "https://.../v1",
+      "defaultModel": "default model (optional)",
+      "add": "Add"
+    },
+    "provider": {
+      "keys": "Keys",
+      "models": "Models",
+      "settings": "Settings",
+      "checkAll": "Check all keys",
+      "checking": "Checking…",
+      "valid": "Valid",
+      "invalid": "Invalid",
+      "check": "Check",
+      "enable": "Enable",
+      "disable": "Disable",
+      "delete": "Delete",
+      "requests": "requests",
+      "errors": "errors",
+      "cooldown": "cooldown",
+      "disabled": "disabled",
+      "selectDefault": "Select default model",
+      "rescan": "Rescan",
+      "scanning": "Scanning…",
+      "scanStarted": "Scan started in background",
+      "lastScan": "Last scan",
+      "notScanned": "Not scanned yet",
+      "autoScanning": "Auto scanning…",
+      "defaultPinned": "Default pinned",
+      "discovering": "Discovering models that work with your keys…",
+      "noValidModels": "No valid models yet",
+      "unconfirmed": "Unconfirmed",
+      "rateLimit": "rate limit or timeout",
+      "save": "Save",
+      "saved": "Saved",
+      "deleteProvider": "Delete provider",
+      "deleteConfirm": "Delete {{name}} with all its keys?"
+    },
+    "toasts": {
+      "copyFailed": "Copy failed, copy manually",
+      "noActiveKeys": "No active keys",
+      "scanStarted": "Scan started in background",
+      "autoScanning": "Automatically scanning models…",
+      "defaultSet": "Default set: {{model}}",
+      "defaultUnset": "Default unset",
+      "detecting": "Detecting and verifying…"
+    },
+    "errors": {
+      "denied": "Denied: Open the panel from http://127.0.0.1:8787/admin",
+      "noKeyFound": "No key found in text"
+    }
+  }
+}

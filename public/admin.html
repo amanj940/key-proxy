@@ -2,6 +2,7 @@
 <html lang="en"><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Key Proxy</title>
+<script src="https://cdn.jsdelivr.net/npm/i18next@23.7.6/i18next.min.js"></script>
 <style>
 :root{--bg:#f3f4f9;--card:#fff;--card2:#f6f7fb;--fg:#12141c;--mut:#6b7280;--bd:#e3e6ee;--ac:#6366f1;--ac2:#8b5cf6;--bad:#ef4444;--ok:#10b981;--warn:#f59e0b;--sh:0 12px 32px -14px rgba(30,41,59,.22)}
 @media(prefers-color-scheme:dark){:root{--bg:#090a0f;--card:#12141e;--card2:#181b29;--fg:#eceef7;--mut:#8b91a8;--bd:#232738;--sh:0 12px 32px -14px rgba(0,0,0,.7)}}
@@ -65,22 +66,30 @@ details.prov>summary b{flex:1;direction:ltr;text-align:right;font-size:16px}
 .sw input{opacity:0;width:0;height:0;min-width:0;position:absolute}
 .sw i{position:absolute;inset:0;border-radius:99px;background:var(--bd);transition:.2s;cursor:pointer}
 .sw i::before{content:"";position:absolute;width:16px;height:16px;top:3px;right:3px;border-radius:50%;background:#fff;transition:.2s}
+[dir=rtl] .sw i::before{right:auto;left:3px}
 .sw input:checked+i{background:var(--ok)} .sw input:checked+i::before{transform:translateX(-16px)}
+[dir=rtl] .sw input:checked+i::before{transform:translateX(16px)}
 table{width:100%;border-collapse:collapse} td,th{text-align:right;padding:9px 6px;border-bottom:1px solid var(--bd);font-size:14px} th{color:var(--mut);font-weight:500;font-size:12.5px}
+[dir=rtl] td,[dir=rtl] th{text-align:left}
 code{direction:ltr;unicode-bidi:embed;word-break:break-all;font-family:ui-monospace,Menlo,monospace;font-size:13px}
 .newkey{margin-top:10px;padding:12px;border:1px dashed var(--ac);border-radius:12px;background:rgba(99,102,241,.07)}
 .newkey code{display:block;margin:8px 0}
 .mut{color:var(--mut)}
 #toasts{position:fixed;bottom:18px;left:18px;display:flex;flex-direction:column;gap:8px;z-index:9}
+[dir=rtl] #toasts{left:auto;right:18px}
 .toast{background:var(--card);border:1px solid var(--bd);border-right:4px solid var(--ac);padding:10px 16px;border-radius:12px;box-shadow:var(--sh);max-width:340px;animation:in .25s}
+[dir=rtl] .toast{border-right:1px solid var(--bd);border-left:4px solid var(--ac)}
 .toast.ok{border-right-color:var(--ok)} .toast.bad{border-right-color:var(--bad)}
+[dir=rtl] .toast.ok{border-left-color:var(--ok);border-right:1px solid var(--bd)}
+[dir=rtl] .toast.bad{border-left-color:var(--bad);border-right:1px solid var(--bd)}
 @keyframes in{from{opacity:0;transform:translateY(10px)}}
 @media(max-width:560px){.tiles{grid-template-columns:1fr 1fr 1fr;gap:8px}.tile b{font-size:22px}}
 </style>
 <div class="wrap">
   <div class="top">
     <div class="logo">🔑</div>
-    <h1>Key Proxy<small>Provider keys in one place · Auto rotation · OpenAI interface</small></h1>
+    <h1 id="title">Key Proxy<small id="subtitle">Provider keys in one place · Auto rotation · OpenAI interface</small></h1>
+    <button id="langToggle" class="ghost sm" style="margin-left:auto">🇺🇸</button>
     <span id="scan"></span>
   </div>
   <div class="tiles" id="tiles"></div>
@@ -89,6 +98,75 @@ code{direction:ltr;unicode-bidi:embed;word-break:break-all;font-family:ui-monosp
 </div>
 <div id="toasts"></div>
 <script>
+// i18n initialization
+async function initI18n() {
+  const savedLang = localStorage.getItem('keyproxy-lang') || 'en';
+  
+  // Load translation resources
+  const [enRes, arRes] = await Promise.all([
+    fetch('/locales/en.json').then(r => r.json()),
+    fetch('/locales/ar.json').then(r => r.json())
+  ]);
+  
+  await i18next.init({
+    lng: savedLang,
+    resources: {
+      en: { translation: enRes.translation },
+      ar: { translation: arRes.translation }
+    },
+    fallbackLng: 'en'
+  });
+  
+  // Set direction and language toggle
+  updateLanguage(savedLang);
+  
+  // Update UI on language change
+  i18next.on('languageChanged', updateLanguage);
+}
+
+function updateLanguage(lang) {
+  const isRTL = lang === 'ar';
+  document.documentElement.dir = isRTL ? 'rtl' : 'ltr';
+  document.documentElement.lang = lang;
+  
+  // Update language toggle button
+  const langToggle = document.getElementById('langToggle');
+  if (langToggle) {
+    langToggle.textContent = lang === 'ar' ? '🇸🇦' : '🇺🇸';
+  }
+  
+  // Save preference
+  localStorage.setItem('keyproxy-lang', lang);
+  
+  // Re-render to update all text
+  if (typeof render === 'function') render();
+}
+
+function t(key, options) {
+  return i18next.t(key, options);
+}
+
+// Make t function globally accessible
+window.t = t;
+
+// Initialize i18n
+initI18n().then(() => {
+  // Call initial render after i18n is ready
+  if (typeof render === 'function') render();
+});
+
+// Language toggle handler
+document.addEventListener('DOMContentLoaded', () => {
+  const langToggle = document.getElementById('langToggle');
+  if (langToggle) {
+    langToggle.onclick = () => {
+      const currentLang = i18next.language;
+      const newLang = currentLang === 'ar' ? 'en' : 'ar';
+      i18next.changeLanguage(newLang);
+    };
+  }
+});
+
 const $=(s)=>document.querySelector(s);
 const h=(t,a={},...c)=>{const e=document.createElement(t);for(const[k,v]of Object.entries(a)){if(k.startsWith('on'))e.addEventListener(k.slice(2),v);else if(k==='class')e.className=v;else if(v===true)e.setAttribute(k,'');else if(v!==false&&v!=null)e.setAttribute(k,v)}e.append(...c.flat().filter(x=>x!=null&&x!==false));return e};
 let S=null,LAST=[];const OPEN=new Set(),UI={};
@@ -100,58 +178,58 @@ async function api(m,p,b){
   if(r.status===401||r.status===403)throw new Error('Denied: Open the panel from http://127.0.0.1:8787/admin');
   return r.json();
 }
-function toast(msg,kind=''){const t=h('div',{class:'toast '+kind},msg);$('#toasts').append(t);setTimeout(()=>t.remove(),kind==='bad'?7000:3800)}
+function toast(msg,kind=''){const el=h('div',{class:'toast '+kind},msg);$('#toasts').append(el);setTimeout(()=>el.remove(),kind==='bad'?7000:3800)}
 async function busy(btn,txt,fn,done){
   btn.disabled=true;btn.textContent=txt;
   try{const r=await fn();if(r&&r.error)toast(r.error,'bad');else if(done)toast(done(r),'ok')}catch(e){toast(e.message,'bad')}
   await render();
 }
-const copy=async(t)=>{try{await navigator.clipboard.writeText(t);toast('Copied','ok')}catch{toast('Copy failed, copy manually','bad')}};
+const copy=async(txt)=>{try{await navigator.clipboard.writeText(txt);toast(window.t('projectKeys.copy'),'ok')}catch{toast(window.t('toasts.copyFailed'),'bad')}};
 const st=(m)=>m.ok===true?'ok':m.ok===false?'bad':'unk';
 const kst=(k)=>k.status==='valid'?'ok':(k.status==='invalid'||k.status==='nocredit')?'bad':'unk';
-const ktxt=(k)=>k.status==='valid'?'Valid':k.status==='invalid'?'Invalid':k.status==='nocredit'?'No credit':'Unverified';
+const ktxt=(k)=>k.status==='valid'?window.t('provider.valid'):k.status==='invalid'?window.t('provider.invalid'):k.status==='nocredit'?window.t('providers.noCredit'):'Unverified';
 
 async function addKeys(btn,ta){
   if(!ta.value.trim())return;
-  btn.disabled=true;btn.textContent='Detecting and verifying…';
+  btn.disabled=true;btn.textContent=window.t('toasts.detecting');
   try{
     const r=await api('POST','/keys/smart',{text:ta.value});
     if(r.error)toast(r.error,'bad');
     else{
       LAST=r.results;ta.value='';
       for(const n of new Set(r.results.filter(x=>x.status==='added').map(x=>x.provider)))OPEN.add(n);
-      toast('Automatically scanning models…','ok');
+      toast(window.t('toasts.autoScanning'),'ok');
     }
   }catch(e){toast(e.message,'bad')}
   render();
 }
 async function fullScan(btn){
   const ps=S.providers.filter(p=>p.keys.some(k=>!k.disabled));
-  if(!ps.length)return toast('No active keys','bad');
+  if(!ps.length)return toast(window.t('toasts.noActiveKeys'),'bad');
   btn.disabled=true;
   for(const p of ps){await api('POST',`/providers/${p.name}/verify`,{});await api('POST',`/providers/${p.name}/rescan`)}
-  toast('Scan started in background','ok');render();
+  toast(window.t('toasts.scanStarted'),'ok');render();
 }
 function chip(r){
-  const t={
-    added:`${r.provider} · …${r.tail} · `+(r.verified?'Key verified':'Added but not verified yet, will verify when scanning models'),
-    duplicate:`…${r.tail} already exists in ${r.provider}`,
-    invalid:`…${r.tail} rejected by ${r.provider} (HTTP ${r.code||'?'}) and not saved`,
-    unknown:`…${r.tail} provider unknown and not accepted by any of your providers. Add provider from "Advanced" then paste again`
+  const chipText={
+    added:`${r.provider} · …${r.tail} · `+(r.verified?window.t('chips.added'):window.t('chips.addedNotVerified')),
+    duplicate:`…${r.tail} ${window.t('chips.duplicate')} ${r.provider}`,
+    invalid:`…${r.tail} ${window.t('chips.invalid')} ${r.provider} (HTTP ${r.code||'?'}) ${window.t('chips.notSaved')}`,
+    unknown:`…${r.tail} ${window.t('chips.unknown')}`
   }[r.status];
-  return h('div',{class:'chip '+r.status},{added:'✅',duplicate:'♻️',invalid:'❌',unknown:'❓'}[r.status],t);
+  return h('div',{class:'chip '+r.status},{added:'✅',duplicate:'♻️',invalid:'❌',unknown:'❓'}[r.status],chipText);
 }
 
 function keysTab(p){
-  const vb=h('button',{class:'ghost sm'},'Check all keys');
-  vb.onclick=()=>busy(vb,'Checking…',()=>api('POST',`/providers/${p.name}/verify`,{}),r=>`Valid: ${r.results.filter(x=>x.state==='valid').length} · Invalid: ${r.results.filter(x=>x.state==='invalid').length}`);
+  const vb=h('button',{class:'ghost sm'},window.t('provider.checkAll'));
+  vb.onclick=()=>busy(vb,window.t('provider.checking'),()=>api('POST',`/providers/${p.name}/verify`,{}),r=>`${window.t('provider.valid')}: ${r.results.filter(x=>x.state==='valid').length} · ${window.t('provider.invalid')}: ${r.results.filter(x=>x.state==='invalid').length}`);
   return h('div',{},h('div',{class:'row'},vb),
     ...p.keys.map(k=>{
-      const v=h('button',{class:'ghost sm'},'Check');v.onclick=()=>busy(v,'…',()=>api('POST',`/providers/${p.name}/verify`,{id:k.id}),r=>ktxt({status:r.results[0]?.state==='valid'?'valid':r.results[0]?.state==='invalid'?'invalid':''}));
-      const tg=h('button',{class:'ghost sm'},k.disabled?'Enable':'Disable');tg.onclick=()=>busy(tg,'…',()=>api('POST',`/providers/${p.name}/keys/${k.id}/toggle`));
-      const rm=h('button',{class:'bad sm'},'Delete');rm.onclick=()=>busy(rm,'…',()=>api('DELETE',`/providers/${p.name}/keys/${k.id}`));
+      const v=h('button',{class:'ghost sm'},window.t('provider.check'));v.onclick=()=>busy(v,'…',()=>api('POST',`/providers/${p.name}/verify`,{id:k.id}),r=>ktxt({status:r.results[0]?.state==='valid'?'valid':r.results[0]?.state==='invalid'?'invalid':''}));
+      const tg=h('button',{class:'ghost sm'},k.disabled?window.t('provider.enable'):window.t('provider.disable'));tg.onclick=()=>busy(tg,'…',()=>api('POST',`/providers/${p.name}/keys/${k.id}/toggle`));
+      const rm=h('button',{class:'bad sm'},window.t('provider.delete'));rm.onclick=()=>busy(rm,'…',()=>api('DELETE',`/providers/${p.name}/keys/${k.id}`));
       return h('div',{class:'item'},h('i',{class:'dot '+kst(k)}),h('code',{},'…'+k.tail),h('span',{class:'tag'},ktxt(k)),
-        h('span',{class:'grow'},`${k.used} requests · ${k.errors} errors`+(k.cooldown?` · cooldown ${k.cooldown}s`:'')+(k.disabled?' · disabled':'')),v,tg,rm);
+        h('span',{class:'grow'},`${k.used} ${window.t('provider.requests')} · ${k.errors} ${window.t('provider.errors')}`+(k.cooldown?` · ${window.t('provider.cooldown')} ${k.cooldown}s`:'')+(k.disabled?' · '+window.t('provider.disabled'):'')),v,tg,rm);
     }));
 }
 function modelsTab(p){
@@ -161,26 +239,26 @@ function modelsTab(p){
   const chat=(l)=>l.filter(([,m])=>m.type==='chat').map(([id])=>id);
   const opts=[...chat(good).map(id=>[id,id]),...chat(unk).map(id=>[id,id+' (unconfirmed)'])];
   if(p.defaultModel&&!opts.some(([id])=>id===p.defaultModel))opts.unshift([p.defaultModel,p.defaultModel+' (untested)']);
-  const sel=h('select',{},h('option',{value:''},'— Select default model —'),
+  const sel=h('select',{},h('option',{value:''},'— '+window.t('provider.selectDefault')+' —'),
     ...opts.map(([id,t])=>h('option',{value:id,selected:id===p.defaultModel},t)));
-  sel.onchange=async()=>{const v=sel.value;try{await api('PUT','/providers/'+p.name,{defaultModel:v});toast(v?'Default set: '+v:'Default unset','ok')}catch(e){toast(e.message,'bad')}render()};
-  const rs=h('button',{class:'ghost'},p.scanning?'Scanning…':'Rescan');rs.disabled=!!p.scanning;
-  rs.onclick=()=>busy(rs,'…',()=>api('POST',`/providers/${p.name}/rescan`),()=>'Scan started in background');
+  sel.onchange=async()=>{const v=sel.value;try{await api('PUT','/providers/'+p.name,{defaultModel:v});toast(v?window.t('toasts.defaultSet',{model:v}):window.t('toasts.defaultUnset'),'ok')}catch(e){toast(e.message,'bad')}render()};
+  const rs=h('button',{class:'ghost'},p.scanning?window.t('provider.scanning'):window.t('provider.rescan'));rs.disabled=!!p.scanning;
+  rs.onclick=()=>busy(rs,'…',()=>api('POST',`/providers/${p.name}/rescan`),()=>window.t('toasts.scanStarted'));
   const row=([id,m])=>{
     const cb=h('input',{type:'checkbox',checked:m.enabled!==false});cb.onchange=()=>api('POST',`/providers/${p.name}/models/set`,{id,enabled:cb.checked});
     return h('div',{class:'item'},h('i',{class:'dot '+st(m)}),h('code',{},id),h('span',{class:'tag'},m.type),h('span',{class:'grow'},m.err||''),h('label',{class:'sw'},cb,h('i')));
   };
-  const when=p.scannedAt?'Last scan: '+new Date(p.scannedAt).toLocaleString('en'):'Not scanned yet';
+  const when=p.scannedAt?window.t('provider.lastScan')+': '+new Date(p.scannedAt).toLocaleString('en'):window.t('provider.notScanned');
   return h('div',{},h('div',{class:'row'},sel,rs),
     p.note?h('div',{class:'chip unknown'},'⚠️ '+p.note):null,
-    h('p',{class:'mut',style:'font-size:12.5px;margin:4px 0'},(p.scanning?'⏳ Auto scanning… ':'')+when+(p.locked?' · Default pinned':'')),
-    ...(good.length?good.map(row):[h('p',{class:'mut'},p.scanning?'Discovering models that work with your keys…':(p.note?'':'No valid models yet.'))]),
-    unk.length?h('details',{style:'margin-top:10px'},h('summary',{class:'mut'},`Unconfirmed (${unk.length}): rate limit or timeout`),...unk.map(row)):null);
+    h('p',{class:'mut',style:'font-size:12.5px;margin:4px 0'},(p.scanning?window.t('provider.autoScanning')+' ':window.t(''))+when+(p.locked?' · '+window.t('provider.defaultPinned'):'')),
+    ...(good.length?good.map(row):[h('p',{class:'mut'},p.scanning?window.t('provider.discovering'):(p.note?'':window.t('provider.noValidModels')))]),
+    unk.length?h('details',{style:'margin-top:10px'},h('summary',{class:'mut'},`${window.t('provider.unconfirmed')} (${unk.length}): ${window.t('provider.rateLimit')}`),...unk.map(row)):null);
 }
 function settingsTab(p){
-  const url=h('input',{value:p.baseUrl||''}),mdl=h('input',{value:p.defaultModel||'',placeholder:'default model'});
-  const sv=h('button',{},'Save');sv.onclick=()=>busy(sv,'…',()=>api('PUT','/providers/'+p.name,{baseUrl:url.value,defaultModel:mdl.value}),()=>'Saved');
-  const del=h('button',{class:'bad'},'Delete provider');del.onclick=()=>{if(confirm('Delete '+p.name+' with all its keys?'))busy(del,'…',()=>api('DELETE','/providers/'+p.name))};
+  const url=h('input',{value:p.baseUrl||''}),mdl=h('input',{value:p.defaultModel||'',placeholder:window.t('advanced.defaultModel')});
+  const sv=h('button',{},window.t('provider.save'));sv.onclick=()=>busy(sv,'…',()=>api('PUT','/providers/'+p.name,{baseUrl:url.value,defaultModel:mdl.value}),()=>window.t('provider.saved'));
+  const del=h('button',{class:'bad'},window.t('provider.deleteProvider'));del.onclick=()=>{if(confirm(window.t('provider.deleteConfirm',{name:p.name})))busy(del,'…',()=>api('DELETE','/providers/'+p.name))};
   return h('div',{},h('div',{class:'row'},url,mdl),h('div',{class:'row'},sv,del));
 }
 function provider(p){
@@ -189,16 +267,16 @@ function provider(p){
   const badk=p.keys.filter(k=>k.status==='invalid').length;
   const body=h('div',{class:'pbody'});
   const draw=()=>{
-    const tabs=h('div',{class:'tabs'},...[['keys','Keys'],['models','Models'],['set','Settings']].map(([k,t])=>{const b=h('button',{class:'tab'+(u.tab===k?' on':'')},t);b.onclick=()=>{u.tab=k;draw()};return b}));
+    const tabs=h('div',{class:'tabs'},...[['keys',window.t('provider.keys')],['models',window.t('provider.models')],['set',window.t('provider.settings')]].map(([k,txt])=>{const b=h('button',{class:'tab'+(u.tab===k?' on':'')},txt);b.onclick=()=>{u.tab=k;draw()};return b}));
     body.replaceChildren(tabs,u.tab==='keys'?keysTab(p):u.tab==='models'?modelsTab(p):settingsTab(p));
   };
   draw();
   const d=h('details',{class:'prov'},
     h('summary',{},h('div',{class:'av',style:'background:'+color(p.name)},p.name[0]),h('b',{},p.name),
-      badk?h('span',{class:'pill bad'},badk+' invalid'):null,
-      p.keys.length&&p.keys.every(k=>k.status==='nocredit')?h('span',{class:'pill bad'},'no credit'):null,
-      h('span',{class:'pill'},p.keys.length+' keys'),
-      h('span',{class:'pill'+(okc?' ok':'')},ms.length?okc+' working model':'not scanned')),body);
+      badk?h('span',{class:'pill bad'},badk+' '+window.t('providers.invalid')):null,
+      p.keys.length&&p.keys.every(k=>k.status==='nocredit')?h('span',{class:'pill bad'},window.t('providers.noCredit')):null,
+      h('span',{class:'pill'},p.keys.length+' '+window.t('providers.keys')),
+      h('span',{class:'pill'+(okc?' ok':'')},ms.length?okc+' '+window.t('providers.workingModel'):window.t('providers.notScanned'))),body);
   if(OPEN.has(p.name))d.open=true;
   d.addEventListener('toggle',()=>d.open?OPEN.add(p.name):OPEN.delete(p.name));
   return d;
@@ -209,45 +287,49 @@ async function render(){
   const withKeys=S.providers.filter(p=>p.keys.length),without=S.providers.filter(p=>!p.keys.length);
   const tk=S.providers.reduce((a,p)=>a+p.keys.filter(k=>!k.disabled).length,0);
   const okm=S.providers.reduce((a,p)=>a+Object.values(p.models||{}).filter(m=>m.type==='chat'&&m.ok===true).length,0);
-  $('#tiles').replaceChildren(...[[tk,'active keys'],[withKeys.length,'providers'],[okm,'valid models']].map(([n,t])=>h('div',{class:'tile'},h('b',{},String(n)),h('span',{},t))));
-  const sc=h('button',{},'⚡ Full scan');sc.onclick=()=>fullScan(sc);$('#scan').replaceChildren(sc);
+  $('#tiles').replaceChildren(...[[tk,window.t('tiles.activeKeys')],[withKeys.length,window.t('tiles.providers')],[okm,window.t('tiles.validModels')]].map(([n,t])=>h('div',{class:'tile'},h('b',{},String(n)),h('span',{},t))));
+  const sc=h('button',{},'⚡ '+window.t('fullScan'));sc.onclick=()=>fullScan(sc);$('#scan').replaceChildren(sc);
+  
+  // Update title and subtitle
+  $('#title').firstChild.textContent = window.t('admin.title');
+  $('#subtitle').textContent = window.t('admin.subtitle');
 
-  const ta=h('textarea',{placeholder:'Paste keys from any provider (one key per line) or copy a full .env file, or drag and drop file here'});
+  const ta=h('textarea',{placeholder:window.t('addProviderKeys.placeholder')});
   ta.ondragover=(e)=>{e.preventDefault();ta.classList.add('drag')};ta.ondragleave=()=>ta.classList.remove('drag');
   ta.ondrop=async(e)=>{e.preventDefault();ta.classList.remove('drag');const f=e.dataTransfer.files[0];if(f)ta.value+=(ta.value?'\n':'')+await f.text()};
-  const add=h('button',{},'Detect and add');add.onclick=()=>addKeys(add,ta);
-  app.append(h('section',{class:'card'},h('h2',{},'Add provider keys'),
-    h('p',{class:'sub'},'One box for all providers. Provider is auto-detected and each key is verified before saving.'),
+  const add=h('button',{},window.t('addProviderKeys.button'));add.onclick=()=>addKeys(add,ta);
+  app.append(h('section',{class:'card'},h('h2',{},window.t('addProviderKeys.title')),
+    h('p',{class:'sub'},window.t('addProviderKeys.subtitle')),
     ta,h('div',{class:'row'},add),LAST.length?h('div',{class:'chips'},...LAST.map(chip)):null));
 
-  const nm=h('input',{placeholder:'Project name'});
+  const nm=h('input',{placeholder:window.t('projectKeys.placeholder')});
   const out=h('div',{});
-  const mk=h('button',{},'Create key');
+  const mk=h('button',{},window.t('projectKeys.button'));
   mk.onclick=async()=>{
     if(!nm.value.trim())return;
     const r=await api('POST','/clients',{name:nm.value});
     await render();
-    $('#newkey').replaceChildren(h('div',{class:'newkey'},h('b',{},'Copy the key now, it will not appear again'),h('code',{},r.key),h('button',{class:'sm',onclick:()=>copy(r.key)},'Copy')))
+    $('#newkey').replaceChildren(h('div',{class:'newkey'},h('b',{},window.t('projectKeys.copyNow')),h('code',{},r.key),h('button',{class:'sm',onclick:()=>copy(r.key)},window.t('projectKeys.copy'))))
   };
-  app.append(h('section',{class:'card'},h('h2',{},'Project keys'),
-    h('p',{class:'sub'},'Give each project its own key instead of provider keys. If leaked, just delete it.'),
+  app.append(h('section',{class:'card'},h('h2',{},window.t('projectKeys.title')),
+    h('p',{class:'sub'},window.t('projectKeys.subtitle')),
     h('div',{class:'row'},nm,mk),h('div',{id:'newkey'}),
-    S.clients.length?h('table',{},h('tr',{},...['Name','Key','Requests',''].map(x=>h('th',{},x))),
-      ...S.clients.map(c=>{const b=h('button',{class:'bad sm'},'Delete');b.onclick=()=>{if(confirm('Delete this key?'))busy(b,'…',()=>api('DELETE','/clients/'+c.id))};
+    S.clients.length?h('table',{},h('tr',{},...[window.t('projectKeys.name'),window.t('projectKeys.key'),window.t('projectKeys.requests'),''].map(x=>h('th',{},x))),
+      ...S.clients.map(c=>{const b=h('button',{class:'bad sm'},window.t('projectKeys.delete'));b.onclick=()=>{if(confirm(window.t('projectKeys.deleteConfirm')))busy(b,'…',()=>api('DELETE','/clients/'+c.id))};
         return h('tr',{},h('td',{},c.name),h('td',{},h('code',{},c.prefix)),h('td',{},String(c.used||0)),h('td',{},b))})):null,
-    h('div',{class:'row mut',style:'font-size:13px'},'To connect in any project:',h('code',{},'OPENAI_BASE_URL=http://127.0.0.1:8787/v1'),
-      h('button',{class:'ghost sm',onclick:()=>copy('OPENAI_BASE_URL=http://127.0.0.1:8787/v1')},'Copy'))));
+    h('div',{class:'row mut',style:'font-size:13px'},window.t('projectKeys.toConnect'),h('code',{},'OPENAI_BASE_URL=http://127.0.0.1:8787/v1'),
+      h('button',{class:'ghost sm',onclick:()=>copy('OPENAI_BASE_URL=http://127.0.0.1:8787/v1')},window.t('projectKeys.copy'))));
 
-  app.append(h('section',{class:'card'},h('h2',{},'Providers'),h('p',{class:'sub'},'Open any provider to manage its keys and models.'),
-    ...(withKeys.length?withKeys.map(provider):[h('p',{class:'mut'},'No keys yet. Paste them above.')]),
-    without.length?h('details',{style:'margin-top:12px'},h('summary',{class:'mut'},`Providers without keys (${without.length})`),
+  app.append(h('section',{class:'card'},h('h2',{},window.t('providers.title')),h('p',{class:'sub'},window.t('providers.subtitle')),
+    ...(withKeys.length?withKeys.map(provider):[h('p',{class:'mut'},window.t('providers.noKeys'))]),
+    without.length?h('details',{style:'margin-top:12px'},h('summary',{class:'mut'},`${window.t('providers.withoutKeys')} (${without.length})`),
       h('div',{class:'row'},...without.map(p=>h('span',{class:'pill'},p.name)))):null));
 
-  const cn=h('input',{placeholder:'name'}),cu=h('input',{placeholder:'https://.../v1'}),cm=h('input',{placeholder:'default model (optional)'});
-  const ab=h('button',{},'Add');ab.onclick=()=>busy(ab,'…',()=>api('PUT','/providers/'+cn.value.trim().toLowerCase(),{baseUrl:cu.value,defaultModel:cm.value}));
-  app.append(h('details',{class:'card'},h('summary',{},'Advanced: Add another OpenAI-compatible provider'),h('div',{class:'row'},cn,cu,cm,ab)));
+  const cn=h('input',{placeholder:window.t('advanced.name')}),cu=h('input',{placeholder:window.t('advanced.baseUrl')}),cm=h('input',{placeholder:window.t('advanced.defaultModel')});
+  const ab=h('button',{},window.t('advanced.add'));ab.onclick=()=>busy(ab,'…',()=>api('PUT','/providers/'+cn.value.trim().toLowerCase(),{baseUrl:cu.value,defaultModel:cm.value}));
+  app.append(h('details',{class:'card'},h('summary',{},window.t('advanced.title')),h('div',{class:'row'},cn,cu,cm,ab)));
 }
-render();
+// Initial render will be called after i18n is ready
 setInterval(()=>{if(S&&S.providers.some(p=>p.scanning)&&!document.activeElement?.matches('textarea,input,select'))render()},5000);
 </script>
 </html>

@@ -97,6 +97,7 @@ app.use(A, (req, res, next) => {
   next();
 });
 app.use('/admin', express.static(fileURLToPath(new URL('./public', import.meta.url)), { index: 'admin.html' }));
+app.use('/locales', express.static(fileURLToPath(new URL('./locales', import.meta.url))));
 
 mountModels(app, A);
 mountSmart(app, A);
