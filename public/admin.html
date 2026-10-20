@@ -319,7 +319,7 @@ async function render(){
     h('div',{class:'row'},nm,mk),h('div',{id:'newkey'}),
     S.clients.length?h('table',{},h('tr',{},...[window.t('projectKeys.name'),window.t('projectKeys.key'),window.t('projectKeys.requests'),''].map(x=>h('th',{},x))),
       ...S.clients.map(c=>{const b=h('button',{class:'bad sm'},window.t('projectKeys.delete'));b.onclick=()=>{if(confirm(window.t('projectKeys.deleteConfirm')))busy(b,'…',()=>api('DELETE','/clients/'+c.id))};
-        return h('tr',{},h('td',{},c.name),h('td',{},h('code',{},c.prefix)),h('td',{},String(c.used||0)),h('td',{},b))})):null,
+        return h('tr',{},h('td',{},c.name),h('td',{},h('code',{},c.prefix)),h('td',{},String(c.used||0)),h('td',{},b));})):null,
     h('div',{class:'row mut',style:'font-size:13px'},window.t('projectKeys.toConnect'),h('code',{},'OPENAI_BASE_URL=http://127.0.0.1:8787/v1'),
       h('button',{class:'ghost sm',onclick:()=>copy('OPENAI_BASE_URL=http://127.0.0.1:8787/v1')},window.t('projectKeys.copy'))));
 
