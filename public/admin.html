@@ -1,0 +1,253 @@
+<!doctype html>
+<html lang="ar" dir="rtl"><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Key Proxy</title>
+<style>
+:root{--bg:#f3f4f9;--card:#fff;--card2:#f6f7fb;--fg:#12141c;--mut:#6b7280;--bd:#e3e6ee;--ac:#6366f1;--ac2:#8b5cf6;--bad:#ef4444;--ok:#10b981;--warn:#f59e0b;--sh:0 12px 32px -14px rgba(30,41,59,.22)}
+@media(prefers-color-scheme:dark){:root{--bg:#090a0f;--card:#12141e;--card2:#181b29;--fg:#eceef7;--mut:#8b91a8;--bd:#232738;--sh:0 12px 32px -14px rgba(0,0,0,.7)}}
+*{box-sizing:border-box}
+body{margin:0;font:15px/1.5 "Segoe UI",Tahoma,system-ui,sans-serif;color:var(--fg);min-height:100vh;
+background:radial-gradient(1100px 480px at 85% -10%,rgba(99,102,241,.2),transparent),radial-gradient(800px 380px at 0% 0%,rgba(139,92,246,.14),transparent),var(--bg)}
+.wrap{max-width:940px;margin:0 auto;padding:22px 16px 60px}
+.top{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+.logo{width:46px;height:46px;border-radius:14px;display:grid;place-items:center;font-size:23px;color:#fff;background:linear-gradient(135deg,var(--ac),var(--ac2));box-shadow:0 8px 22px -6px rgba(99,102,241,.6)}
+.top h1{margin:0;font-size:24px;letter-spacing:.2px;flex:1}
+.top h1 small{display:block;font-size:12px;font-weight:400;color:var(--mut)}
+.tiles{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin:18px 0}
+.tile{background:var(--card);border:1px solid var(--bd);border-radius:16px;padding:14px 16px;box-shadow:var(--sh)}
+.tile b{display:block;font-size:28px;line-height:1.1;background:linear-gradient(135deg,var(--ac),var(--ac2));-webkit-background-clip:text;background-clip:text;color:transparent}
+.tile span{color:var(--mut);font-size:13px}
+#prog{background:var(--card);border:1px solid var(--bd);border-radius:14px;padding:12px 16px;margin-bottom:14px}
+#prog[hidden]{display:none}
+.barbg{height:8px;border-radius:99px;background:var(--card2);overflow:hidden;margin-top:8px}
+#bar{height:100%;width:0;border-radius:99px;background:linear-gradient(90deg,var(--ac),var(--ac2));transition:width .4s}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:18px;padding:18px;margin:14px 0;box-shadow:var(--sh)}
+.card>h2{margin:0;font-size:17px}
+.card>.sub{margin:2px 0 12px;color:var(--mut);font-size:13px}
+input,textarea,select{background:var(--card2);color:var(--fg);border:1px solid var(--bd);border-radius:10px;padding:9px 11px;direction:ltr;font:inherit;flex:1;min-width:120px;outline:none;transition:border-color .15s,box-shadow .15s}
+input:focus,textarea:focus,select:focus{border-color:var(--ac);box-shadow:0 0 0 3px rgba(99,102,241,.2)}
+textarea{width:100%;min-height:120px;font:13px/1.6 ui-monospace,Menlo,monospace;resize:vertical;border-style:dashed}
+textarea.drag{border-color:var(--ac);background:rgba(99,102,241,.08)}
+option{background:var(--card)}
+button{border:0;border-radius:10px;padding:9px 16px;cursor:pointer;font:inherit;font-weight:600;color:#fff;background:linear-gradient(135deg,var(--ac),var(--ac2));box-shadow:0 6px 16px -8px rgba(99,102,241,.8);transition:transform .1s,opacity .15s}
+button:hover{transform:translateY(-1px)} button:active{transform:none}
+button:disabled{opacity:.55;cursor:wait;transform:none}
+button.ghost{background:var(--card2);color:var(--fg);border:1px solid var(--bd);box-shadow:none;font-weight:500}
+button.bad{background:var(--bad);box-shadow:none}
+button.sm{padding:5px 11px;font-size:13px}
+.row{display:flex;gap:8px;margin:10px 0;flex-wrap:wrap;align-items:center}
+.chips{display:flex;flex-direction:column;gap:6px;margin-top:10px;font-size:13px}
+.chip{padding:7px 12px;border-radius:10px;border:1px solid var(--bd);background:var(--card2);display:flex;gap:8px;align-items:center}
+.chip.added{border-color:rgba(16,185,129,.5)} .chip.invalid{border-color:rgba(239,68,68,.5)} .chip.unknown{border-color:rgba(245,158,11,.5)}
+details.prov{border:1px solid var(--bd);border-radius:14px;margin:10px 0;background:var(--card2);overflow:hidden}
+details.prov>summary{display:flex;gap:10px;align-items:center;cursor:pointer;padding:12px 14px;list-style:none}
+details.prov>summary::-webkit-details-marker{display:none}
+details.prov>summary::after{content:"‹";color:var(--mut);transition:transform .2s;font-size:20px}
+details.prov[open]>summary::after{transform:rotate(-90deg)}
+.av{width:36px;height:36px;border-radius:11px;display:grid;place-items:center;color:#fff;font-weight:700;font-size:15px;text-transform:uppercase}
+details.prov>summary b{flex:1;direction:ltr;text-align:right;font-size:16px}
+.pill{font-size:12px;padding:2px 10px;border-radius:99px;border:1px solid var(--bd);color:var(--mut);background:var(--card)}
+.pill.ok{color:var(--ok);border-color:rgba(16,185,129,.5)} .pill.bad{color:var(--bad);border-color:rgba(239,68,68,.5)}
+.pbody{padding:0 14px 14px}
+.tabs{display:flex;gap:4px;margin:2px 0 10px;border-bottom:1px solid var(--bd)}
+.tab{background:none;box-shadow:none;color:var(--mut);border-radius:8px 8px 0 0;padding:8px 14px;font-weight:600;border-bottom:2px solid transparent}
+.tab.on{color:var(--ac);border-bottom-color:var(--ac)}
+.tab:hover{transform:none}
+.item{display:flex;gap:10px;align-items:center;padding:8px 4px;border-top:1px solid var(--bd);flex-wrap:wrap}
+.item .grow{flex:1;color:var(--mut);font-size:12.5px;min-width:80px}
+.dot{width:10px;height:10px;border-radius:50%;background:var(--mut);flex:none;display:inline-block}
+.dot.ok{background:var(--ok);box-shadow:0 0 0 3px rgba(16,185,129,.2)} .dot.bad{background:var(--bad);box-shadow:0 0 0 3px rgba(239,68,68,.2)} .dot.unk{background:var(--warn)}
+.tag{font-size:11px;padding:1px 8px;border-radius:6px;background:var(--card);border:1px solid var(--bd);color:var(--mut)}
+.seg{display:flex;gap:6px;flex-wrap:wrap}
+.seg button{background:var(--card);color:var(--mut);border:1px solid var(--bd);box-shadow:none;padding:4px 12px;font-size:13px;font-weight:500}
+.seg button.on{background:var(--ac);color:#fff;border-color:var(--ac)}
+.sw{position:relative;width:38px;height:22px;flex:none}
+.sw input{opacity:0;width:0;height:0;min-width:0;position:absolute}
+.sw i{position:absolute;inset:0;border-radius:99px;background:var(--bd);transition:.2s;cursor:pointer}
+.sw i::before{content:"";position:absolute;width:16px;height:16px;top:3px;right:3px;border-radius:50%;background:#fff;transition:.2s}
+.sw input:checked+i{background:var(--ok)} .sw input:checked+i::before{transform:translateX(-16px)}
+table{width:100%;border-collapse:collapse} td,th{text-align:right;padding:9px 6px;border-bottom:1px solid var(--bd);font-size:14px} th{color:var(--mut);font-weight:500;font-size:12.5px}
+code{direction:ltr;unicode-bidi:embed;word-break:break-all;font-family:ui-monospace,Menlo,monospace;font-size:13px}
+.newkey{margin-top:10px;padding:12px;border:1px dashed var(--ac);border-radius:12px;background:rgba(99,102,241,.07)}
+.newkey code{display:block;margin:8px 0}
+.mut{color:var(--mut)}
+#toasts{position:fixed;bottom:18px;left:18px;display:flex;flex-direction:column;gap:8px;z-index:9}
+.toast{background:var(--card);border:1px solid var(--bd);border-right:4px solid var(--ac);padding:10px 16px;border-radius:12px;box-shadow:var(--sh);max-width:340px;animation:in .25s}
+.toast.ok{border-right-color:var(--ok)} .toast.bad{border-right-color:var(--bad)}
+@keyframes in{from{opacity:0;transform:translateY(10px)}}
+@media(max-width:560px){.tiles{grid-template-columns:1fr 1fr 1fr;gap:8px}.tile b{font-size:22px}}
+</style>
+<div class="wrap">
+  <div class="top">
+    <div class="logo">🔑</div>
+    <h1>Key Proxy<small>مفاتيح المزودين في مكان واحد · تدوير تلقائي · واجهة OpenAI</small></h1>
+    <span id="scan"></span>
+  </div>
+  <div class="tiles" id="tiles"></div>
+  <div id="prog" hidden><b id="barTxt">…</b><div class="barbg"><div id="bar"></div></div></div>
+  <div id="app"></div>
+</div>
+<div id="toasts"></div>
+<script>
+const $=(s)=>document.querySelector(s);
+const h=(t,a={},...c)=>{const e=document.createElement(t);for(const[k,v]of Object.entries(a)){if(k.startsWith('on'))e.addEventListener(k.slice(2),v);else if(k==='class')e.className=v;else if(v===true)e.setAttribute(k,'');else if(v!==false&&v!=null)e.setAttribute(k,v)}e.append(...c.flat().filter(x=>x!=null&&x!==false));return e};
+let S=null,LAST=[];const OPEN=new Set(),UI={};
+const ui=n=>UI[n]||(UI[n]={tab:'keys',f:'all',q:'',all:false});
+const COL={groq:'#f55036',openrouter:'#7c3aed',gemini:'#2563eb',cerebras:'#0ea5e9',mistral:'#f59e0b',sambanova:'#ea580c',nvidia:'#16a34a',xai:'#111827',fireworks:'#dc2626',huggingface:'#eab308'};
+const color=n=>COL[n]||`hsl(${[...n].reduce((a,c)=>a*31+c.charCodeAt(0),7)%360} 62% 48%)`;
+async function api(m,p,b){
+  const r=await fetch('/admin/api'+p,{method:m,headers:{'Content-Type':'application/json'},body:b?JSON.stringify(b):undefined});
+  if(r.status===401||r.status===403)throw new Error('مرفوض: افتح اللوحة من http://127.0.0.1:8787/admin');
+  return r.json();
+}
+function toast(msg,kind=''){const t=h('div',{class:'toast '+kind},msg);$('#toasts').append(t);setTimeout(()=>t.remove(),kind==='bad'?7000:3800)}
+async function busy(btn,txt,fn,done){
+  btn.disabled=true;btn.textContent=txt;
+  try{const r=await fn();if(r&&r.error)toast(r.error,'bad');else if(done)toast(done(r),'ok')}catch(e){toast(e.message,'bad')}
+  await render();
+}
+const copy=async(t)=>{try{await navigator.clipboard.writeText(t);toast('تم النسخ','ok')}catch{toast('تعذر النسخ، انسخ يدوياً','bad')}};
+const st=(m)=>m.ok===true?'ok':m.ok===false?'bad':'unk';
+const kst=(k)=>k.status==='valid'?'ok':(k.status==='invalid'||k.status==='nocredit')?'bad':'unk';
+const ktxt=(k)=>k.status==='valid'?'سليم':k.status==='invalid'?'مرفوض':k.status==='nocredit'?'بلا رصيد':'غير موثّق';
+
+async function addKeys(btn,ta){
+  if(!ta.value.trim())return;
+  btn.disabled=true;btn.textContent='جارٍ الكشف والتحقق…';
+  try{
+    const r=await api('POST','/keys/smart',{text:ta.value});
+    if(r.error)toast(r.error,'bad');
+    else{
+      LAST=r.results;ta.value='';
+      for(const n of new Set(r.results.filter(x=>x.status==='added').map(x=>x.provider)))OPEN.add(n);
+      toast('جارٍ فحص النماذج تلقائياً…','ok');
+    }
+  }catch(e){toast(e.message,'bad')}
+  render();
+}
+async function fullScan(btn){
+  const ps=S.providers.filter(p=>p.keys.some(k=>!k.disabled));
+  if(!ps.length)return toast('لا توجد مفاتيح مفعّلة','bad');
+  btn.disabled=true;
+  for(const p of ps){await api('POST',`/providers/${p.name}/verify`,{});await api('POST',`/providers/${p.name}/rescan`)}
+  toast('بدأ الفحص في الخلفية','ok');render();
+}
+function chip(r){
+  const t={
+    added:`${r.provider} · …${r.tail} · `+(r.verified?'تم التحقق من المفتاح':'أُضيف لكن لم يُوثَّق بعد، سيُوثَّق عند فحص النماذج'),
+    duplicate:`…${r.tail} موجود مسبقاً في ${r.provider}`,
+    invalid:`…${r.tail} رفضه ${r.provider} (HTTP ${r.code||'؟'}) ولم يُحفظ`,
+    unknown:`…${r.tail} لم أعرف مزوده ولم يقبله أي مزود عندك. أضف المزود من «متقدم» ثم أعد اللصق`
+  }[r.status];
+  return h('div',{class:'chip '+r.status},{added:'✅',duplicate:'♻️',invalid:'❌',unknown:'❓'}[r.status],t);
+}
+
+function keysTab(p){
+  const vb=h('button',{class:'ghost sm'},'فحص كل المفاتيح');
+  vb.onclick=()=>busy(vb,'جارٍ الفحص…',()=>api('POST',`/providers/${p.name}/verify`,{}),r=>`سليم: ${r.results.filter(x=>x.state==='valid').length} · مرفوض: ${r.results.filter(x=>x.state==='invalid').length}`);
+  return h('div',{},h('div',{class:'row'},vb),
+    ...p.keys.map(k=>{
+      const v=h('button',{class:'ghost sm'},'فحص');v.onclick=()=>busy(v,'…',()=>api('POST',`/providers/${p.name}/verify`,{id:k.id}),r=>ktxt({status:r.results[0]?.state==='valid'?'valid':r.results[0]?.state==='invalid'?'invalid':''}));
+      const tg=h('button',{class:'ghost sm'},k.disabled?'تفعيل':'إيقاف');tg.onclick=()=>busy(tg,'…',()=>api('POST',`/providers/${p.name}/keys/${k.id}/toggle`));
+      const rm=h('button',{class:'bad sm'},'حذف');rm.onclick=()=>busy(rm,'…',()=>api('DELETE',`/providers/${p.name}/keys/${k.id}`));
+      return h('div',{class:'item'},h('i',{class:'dot '+kst(k)}),h('code',{},'…'+k.tail),h('span',{class:'tag'},ktxt(k)),
+        h('span',{class:'grow'},`${k.used} طلب · ${k.errors} خطأ`+(k.cooldown?` · موقوف ${k.cooldown}ث`:'')+(k.disabled?' · معطّل':'')),v,tg,rm);
+    }));
+}
+function modelsTab(p){
+  const all=Object.entries(p.models||{});
+  const good=all.filter(([,m])=>m.ok===true).sort((a,b)=>a[0].localeCompare(b[0]));
+  const unk=all.filter(([,m])=>m.ok==null).sort((a,b)=>a[0].localeCompare(b[0]));
+  const chat=(l)=>l.filter(([,m])=>m.type==='chat').map(([id])=>id);
+  const opts=[...chat(good).map(id=>[id,id]),...chat(unk).map(id=>[id,id+' (غير مؤكد)'])];
+  if(p.defaultModel&&!opts.some(([id])=>id===p.defaultModel))opts.unshift([p.defaultModel,p.defaultModel+' (غير مفحوص)']);
+  const sel=h('select',{},h('option',{value:''},'— اختر النموذج الافتراضي —'),
+    ...opts.map(([id,t])=>h('option',{value:id,selected:id===p.defaultModel},t)));
+  sel.onchange=async()=>{const v=sel.value;try{await api('PUT','/providers/'+p.name,{defaultModel:v});toast(v?'تم تثبيت الافتراضي: '+v:'أُلغي التثبيت','ok')}catch(e){toast(e.message,'bad')}render()};
+  const rs=h('button',{class:'ghost'},p.scanning?'جارٍ الفحص…':'إعادة الفحص');rs.disabled=!!p.scanning;
+  rs.onclick=()=>busy(rs,'…',()=>api('POST',`/providers/${p.name}/rescan`),()=>'بدأ الفحص في الخلفية');
+  const row=([id,m])=>{
+    const cb=h('input',{type:'checkbox',checked:m.enabled!==false});cb.onchange=()=>api('POST',`/providers/${p.name}/models/set`,{id,enabled:cb.checked});
+    return h('div',{class:'item'},h('i',{class:'dot '+st(m)}),h('code',{},id),h('span',{class:'tag'},m.type),h('span',{class:'grow'},m.err||''),h('label',{class:'sw'},cb,h('i')));
+  };
+  const when=p.scannedAt?'آخر فحص: '+new Date(p.scannedAt).toLocaleString('ar'):'لم يُفحص بعد';
+  return h('div',{},h('div',{class:'row'},sel,rs),
+    p.note?h('div',{class:'chip unknown'},'⚠️ '+p.note):null,
+    h('p',{class:'mut',style:'font-size:12.5px;margin:4px 0'},(p.scanning?'⏳ يجري الفحص التلقائي… ':'')+when+(p.locked?' · الافتراضي مثبّت':'')),
+    ...(good.length?good.map(row):[h('p',{class:'mut'},p.scanning?'يجري اكتشاف النماذج التي تعمل مع مفاتيحك…':(p.note?'':'لا توجد نماذج سليمة بعد.'))]),
+    unk.length?h('details',{style:'margin-top:10px'},h('summary',{class:'mut'},`غير مؤكدة (${unk.length}): حد طلبات أو مهلة`),...unk.map(row)):null);
+}
+function settingsTab(p){
+  const url=h('input',{value:p.baseUrl||''}),mdl=h('input',{value:p.defaultModel||'',placeholder:'default model'});
+  const sv=h('button',{},'حفظ');sv.onclick=()=>busy(sv,'…',()=>api('PUT','/providers/'+p.name,{baseUrl:url.value,defaultModel:mdl.value}),()=>'تم الحفظ');
+  const del=h('button',{class:'bad'},'حذف المزود');del.onclick=()=>{if(confirm('حذف '+p.name+' بكل مفاتيحه؟'))busy(del,'…',()=>api('DELETE','/providers/'+p.name))};
+  return h('div',{},h('div',{class:'row'},url,mdl),h('div',{class:'row'},sv,del));
+}
+function provider(p){
+  const u=ui(p.name);
+  const ms=Object.values(p.models||{}),okc=ms.filter(m=>m.type==='chat'&&m.ok===true).length;
+  const badk=p.keys.filter(k=>k.status==='invalid').length;
+  const body=h('div',{class:'pbody'});
+  const draw=()=>{
+    const tabs=h('div',{class:'tabs'},...[['keys','المفاتيح'],['models','النماذج'],['set','الإعدادات']].map(([k,t])=>{const b=h('button',{class:'tab'+(u.tab===k?' on':'')},t);b.onclick=()=>{u.tab=k;draw()};return b}));
+    body.replaceChildren(tabs,u.tab==='keys'?keysTab(p):u.tab==='models'?modelsTab(p):settingsTab(p));
+  };
+  draw();
+  const d=h('details',{class:'prov'},
+    h('summary',{},h('div',{class:'av',style:'background:'+color(p.name)},p.name[0]),h('b',{},p.name),
+      badk?h('span',{class:'pill bad'},badk+' مرفوض'):null,
+      p.keys.length&&p.keys.every(k=>k.status==='nocredit')?h('span',{class:'pill bad'},'بلا رصيد'):null,
+      h('span',{class:'pill'},p.keys.length+' مفتاح'),
+      h('span',{class:'pill'+(okc?' ok':'')},ms.length?okc+' نموذج يعمل':'لم تُفحص')),body);
+  if(OPEN.has(p.name))d.open=true;
+  d.addEventListener('toggle',()=>d.open?OPEN.add(p.name):OPEN.delete(p.name));
+  return d;
+}
+async function render(){
+  try{S=await api('GET','/state')}catch(e){toast(e.message,'bad');return}
+  const app=$('#app');app.replaceChildren();
+  const withKeys=S.providers.filter(p=>p.keys.length),without=S.providers.filter(p=>!p.keys.length);
+  const tk=S.providers.reduce((a,p)=>a+p.keys.filter(k=>!k.disabled).length,0);
+  const okm=S.providers.reduce((a,p)=>a+Object.values(p.models||{}).filter(m=>m.type==='chat'&&m.ok===true).length,0);
+  $('#tiles').replaceChildren(...[[tk,'مفتاح مفعّل'],[withKeys.length,'مزود'],[okm,'نموذج سليم']].map(([n,t])=>h('div',{class:'tile'},h('b',{},String(n)),h('span',{},t))));
+  const sc=h('button',{},'⚡ فحص شامل');sc.onclick=()=>fullScan(sc);$('#scan').replaceChildren(sc);
+
+  const ta=h('textarea',{placeholder:'الصق مفاتيح من أي مزود (مفتاح بكل سطر) أو انسخ ملف .env كاملاً، أو اسحب الملف وأفلته هنا'});
+  ta.ondragover=(e)=>{e.preventDefault();ta.classList.add('drag')};ta.ondragleave=()=>ta.classList.remove('drag');
+  ta.ondrop=async(e)=>{e.preventDefault();ta.classList.remove('drag');const f=e.dataTransfer.files[0];if(f)ta.value+=(ta.value?'\n':'')+await f.text()};
+  const add=h('button',{},'كشف وإضافة');add.onclick=()=>addKeys(add,ta);
+  app.append(h('section',{class:'card'},h('h2',{},'إضافة مفاتيح المزودين'),
+    h('p',{class:'sub'},'خانة واحدة لكل المزودين. يُكتشف المزود تلقائياً ويُتحقق من كل مفتاح فعلياً قبل حفظه.'),
+    ta,h('div',{class:'row'},add),LAST.length?h('div',{class:'chips'},...LAST.map(chip)):null));
+
+  const nm=h('input',{placeholder:'اسم المشروع'});
+  const out=h('div',{});
+  const mk=h('button',{},'إنشاء مفتاح');
+  mk.onclick=async()=>{
+    if(!nm.value.trim())return;
+    const r=await api('POST','/clients',{name:nm.value});
+    await render();
+    $('#newkey').replaceChildren(h('div',{class:'newkey'},h('b',{},'انسخ المفتاح الآن، لن يظهر مرة ثانية'),h('code',{},r.key),h('button',{class:'sm',onclick:()=>copy(r.key)},'نسخ')))
+  };
+  app.append(h('section',{class:'card'},h('h2',{},'مفاتيح المشاريع'),
+    h('p',{class:'sub'},'أعطِ كل مشروع مفتاحاً مستقلاً بدل مفاتيح المزودين. إن انكشف احذفه فقط.'),
+    h('div',{class:'row'},nm,mk),h('div',{id:'newkey'}),
+    S.clients.length?h('table',{},h('tr',{},...['الاسم','المفتاح','الطلبات',''].map(x=>h('th',{},x))),
+      ...S.clients.map(c=>{const b=h('button',{class:'bad sm'},'حذف');b.onclick=()=>{if(confirm('حذف هذا المفتاح؟'))busy(b,'…',()=>api('DELETE','/clients/'+c.id))};
+        return h('tr',{},h('td',{},c.name),h('td',{},h('code',{},c.prefix)),h('td',{},String(c.used||0)),h('td',{},b))})):null,
+    h('div',{class:'row mut',style:'font-size:13px'},'للربط في أي مشروع:',h('code',{},'OPENAI_BASE_URL=http://127.0.0.1:8787/v1'),
+      h('button',{class:'ghost sm',onclick:()=>copy('OPENAI_BASE_URL=http://127.0.0.1:8787/v1')},'نسخ'))));
+
+  app.append(h('section',{class:'card'},h('h2',{},'المزودون'),h('p',{class:'sub'},'افتح أي مزود لإدارة مفاتيحه ونماذجه.'),
+    ...(withKeys.length?withKeys.map(provider):[h('p',{class:'mut'},'لا توجد مفاتيح بعد. الصقها في الأعلى.')]),
+    without.length?h('details',{style:'margin-top:12px'},h('summary',{class:'mut'},`مزودون بلا مفاتيح (${without.length})`),
+      h('div',{class:'row'},...without.map(p=>h('span',{class:'pill'},p.name)))):null));
+
+  const cn=h('input',{placeholder:'name'}),cu=h('input',{placeholder:'https://.../v1'}),cm=h('input',{placeholder:'default model (اختياري)'});
+  const ab=h('button',{},'إضافة');ab.onclick=()=>busy(ab,'…',()=>api('PUT','/providers/'+cn.value.trim().toLowerCase(),{baseUrl:cu.value,defaultModel:cm.value}));
+  app.append(h('details',{class:'card'},h('summary',{},'متقدم: إضافة مزود آخر متوافق مع OpenAI'),h('div',{class:'row'},cn,cu,cm,ab)));
+}
+render();
+setInterval(()=>{if(S&&S.providers.some(p=>p.scanning)&&!document.activeElement?.matches('textarea,input,select'))render()},5000);
+</script>
+</html>
