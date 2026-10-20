@@ -16,18 +16,18 @@ async function once(p, id, type, key) {
     });
     if (r.ok) { r.body?.cancel(); return { ok: true }; }
     const t = (await r.text()).replace(/\s+/g, ' ').slice(0, 140);
-    if (r.status === 402) return { ok: null, credit: true, err: '402 بلا رصيد' };
-    if (r.status === 429) return { ok: null, err: '429 محدود مؤقتاً' };
-    if (r.status === 401 || r.status === 403) return { ok: null, err: r.status + ' المفتاح مرفوض' };
+    if (r.status === 402) return { ok: null, credit: true, err: '402 no credit' };
+    if (r.status === 429) return { ok: null, err: '429 rate limited' };
+    if (r.status === 401 || r.status === 403) return { ok: null, err: r.status + ' key rejected' };
     return { ok: false, err: r.status + ' ' + t };
-  } catch { return { ok: null, err: 'مهلة/شبكة' }; }
+  } catch { return { ok: null, err: 'timeout/network' }; }
 }
 
 async function probeRetry(p, id, type, key) {
   let r;
   for (let i = 0; i < 2; i++) {
     r = await once(p, id, type, key);
-    if (r.ok !== null || r.credit || !/429|مهلة/.test(r.err || '')) return r;
+    if (r.ok !== null || r.credit || !/429|timeout/.test(r.err || '')) return r;
     await new Promise((s) => setTimeout(s, 15000));
   }
   return r;
@@ -53,7 +53,7 @@ export async function autoScan(name, classify) {
   running.add(name); p.scanning = true; p.note = '';
   try {
     const j = await listIds(p, cand);
-    if (!j) { p.note = 'تعذر جلب قائمة النماذج من المزود'; return; }
+    if (!j) { p.note = 'Failed to fetch model list from provider'; return; }
     const list = [];
     for (const m of j.data || j.models || []) {
       const id = String(m.id || m.name || '').replace(/^models\//, '');
@@ -68,9 +68,9 @@ export async function autoScan(name, classify) {
     p.models = found; saveModels(name, found); loadToLegacy(); save(true);
     const ids = Object.keys(found);
     const ping = ids.find((id) => found[id].type === 'chat') || ids[0];
-    if (!ping) { p.note = 'المزود لا يعرض نماذج محادثة'; return; }
+    if (!ping) { p.note = 'Provider does not show chat models'; return; }
 
-    // فحص رصيد كل مفتاح
+    // Check credit for each key
     const ok = [];
     for (const k of cand) {
       const r = await once(p, ping, found[ping].type, dec(k.enc));
@@ -87,7 +87,7 @@ export async function autoScan(name, classify) {
       }
     }
     if (!ok.length) {
-      p.models = {}; p.note = 'كل مفاتيح هذا المزود بلا رصيد (402). أضف وسيلة دفع أو رصيداً عنده، وسيعود تلقائياً عند الفحص التالي';
+      p.models = {}; p.note = 'All keys for this provider have no credit (402). Add a payment method or credit there, and it will return automatically on next scan';
       saveModels(name, {});
       updateProviderModels(name, {}, p.note, false, null);
       loadToLegacy();
@@ -122,7 +122,7 @@ export async function autoScan(name, classify) {
     for (const id of ids) if (found[id].ok === false) delete found[id];
     p.scannedAt = Date.now();
     const good = Object.entries(found).filter(([, m]) => m.type === 'chat' && m.ok === true).map(([id]) => id);
-    if (!good.length) p.note = 'لم ينجح أي نموذج في الفحص. راجع أسباب الفشل بجانب كل نموذج';
+    if (!good.length) p.note = 'No model succeeded in the scan. Check failure reasons next to each model';
     if (!p.defaultLocked && good.length && !good.includes(p.defaultModel)) p.defaultModel = good[0];
     saveModels(name, found);
     updateProviderModels(name, found, p.note, false, p.scannedAt);

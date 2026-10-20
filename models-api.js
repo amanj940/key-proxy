@@ -47,7 +47,7 @@ async function probe(p, id, type, key) {
     });
     if (r.ok) { r.body?.cancel(); return { ok: true }; }
     const t = (await r.text()).replace(/\s+/g, ' ').slice(0, 160);
-    if (r.status === 402) return { ok: null, err: '402 بلا رصيد' };
+    if (r.status === 402) return { ok: null, err: '402 no credit' };
     if (r.status === 429) return { ok: null, err: '429 rate limited' };
     if (r.status === 401) return { ok: null, err: '401 key rejected' };
     return { ok: false, err: r.status + ' ' + t };
@@ -78,7 +78,7 @@ export function mountModels(app, A) {
       }
       p.models = found; saveModels(n, found); loadToLegacy(); save(true);
       res.json({ count: Object.keys(found).length });
-    } catch (e) { res.status(502).json({ error: 'تعذر جلب النماذج: ' + e.message }); }
+    } catch (e) { res.status(502).json({ error: 'Failed to fetch models: ' + e.message }); }
   });
 
   app.post(A + '/providers/:n/probe', async (req, res) => {
@@ -86,7 +86,7 @@ export function mountModels(app, A) {
     const p = db.providers[n];
     if (!p) return res.status(404).json({ error: 'no provider' });
     const keys = getKeys(n).filter((k) => !k.disabled);
-    if (!keys.length) return res.status(400).json({ error: 'لا توجد مفاتيح مفعّلة' });
+    if (!keys.length) return res.status(400).json({ error: 'No enabled keys' });
     const all = p.models || {};
     let ids = Array.isArray(req.body?.ids) ? req.body.ids : Object.keys(all);
     ids = ids.filter((id) => all[id] && (all[id].type === 'chat' || all[id].type === 'embedding')).slice(0, 100);

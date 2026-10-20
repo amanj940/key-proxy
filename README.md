@@ -1,64 +1,64 @@
 # Key Proxy
 
-بوابة ذكية لإدارة مفاتيح مزودي الذكاء الاصطناعي في مكان واحد، مع واجهة متوافقة مع OpenAI ودعم للتدوير التلقائي، تتبع التكاليف، وحدود المعدل.
+A smart AI gateway for managing multiple LLM provider keys in one place with OpenAI-compatible interface, automatic key rotation, cost tracking, and rate limiting.
 
-## الميزات
+## Features
 
-### 🔐 الأمان
-- تشفير AES-256-GCM لجميع مفاتيح المزودين
-- مفاتيح مشاريع مستقلة لكل تطبيق
-- فك التشفير فقط في الذاكرة المؤقتة
+### 🔐 Security
+- AES-256-GCM encryption for all provider keys
+- Independent project keys for each application
+- Decryption only in temporary memory
 
-### 🚀 الكشف التلقائي
-- كشف المزود تلقائياً من بادئة المفتاح (gsk_, sk-or-, AIza, إلخ)
-- التحقق الفعلي من كل مفتاح قبل حفظه
-- فحص تلقائي للنماذج المتاحة لكل مزود
+### 🚀 Auto Detection
+- Auto-detect provider from key prefix (gsk_, sk-or-, AIza, etc.)
+- Verify each key before saving
+- Auto-scan available models for each provider
 
-### 🔄 التدوير الذكي
-- تدوير تلقائي للمفاتيح عند التعطل
-- دعم إعادة المحاولة مع cooldown periods
-- fallback بين المزودين
+### 🔄 Smart Rotation
+- Automatic key rotation on failure
+- Retry support with cooldown periods
+- Fallback between providers
 
-### 💰 إدارة التكاليف
-- تتبع الميزانية لكل مشروع
-- حساب التكاليف لكل طلب
-- تنبيهات عند تجاوز الميزانية
+### 💰 Cost Management
+- Budget tracking per project
+- Cost calculation per request
+- Alerts when budget exceeded
 
 ### ⚡ Rate Limiting
 - RPM (Requests Per Minute)
 - TPM (Tokens Per Minute)
-- حدود قابلة للتخصيص لكل مشروع
+- Customizable limits per project
 
-### 📊 المراقبة
-- سجلات مفصلة لكل طلب
-- تتبع الاستهلاك والأداء
-- واجهة إدارة متكاملة
+### 📊 Monitoring
+- Detailed logs for each request
+- Usage and performance tracking
+- Integrated admin interface
 
-## التثبيت
+## Installation
 
-### المتطلبات
-- Node.js 18 أو أحدث
-- npm أو yarn
+### Requirements
+- Node.js 18 or later
+- npm or yarn
 
-### الخطوات
+### Steps
 
-1. استنساخ المشروع:
+1. Clone the repository:
 ```bash
-git clone <repository-url>
+git clone https://github.com/amanj940/key-proxy.git
 cd key-proxy
 ```
 
-2. تثبيت الاعتماديات:
+2. Install dependencies:
 ```bash
 npm install
 ```
 
-3. إنشاء مفتاح التشفير:
+3. Generate encryption key:
 ```bash
 openssl rand -hex 32
 ```
 
-4. إنشاء ملف `.env`:
+4. Create `.env` file:
 ```bash
 MASTER_KEY=<64-char-hex-key-from-step-3>
 DB_PATH=./data/key-proxy.db
@@ -66,48 +66,48 @@ PORT=8787
 HOST=127.0.0.1
 ```
 
-5. تشغيل السيرفر:
+5. Start the server:
 ```bash
 npm start
 ```
 
-أو:
+Or:
 ```bash
 node server.js
 ```
 
-## الاستخدام
+## Usage
 
-### لوحة الإدارة
+### Admin Panel
 
-افتح المتصفح على:
+Open your browser at:
 ```
 http://127.0.0.1:8787/admin
 ```
 
-### إضافة مفاتيح المزودين
+### Adding Provider Keys
 
-1. في لوحة الإدارة، الصق مفاتيح المزودين في خانة "إضافة مفاتيح المزودين"
-2. النظام سيكتشف المزود تلقائياً ويتحقق من المفتاح
-3. يمكن لصق ملف `.env` كامل أو مفاتيح متعددة
+1. In the admin panel, paste provider keys in the "Add Provider Keys" section
+2. The system will auto-detect the provider and verify the key
+3. You can paste a complete `.env` file or multiple keys
 
-### إنشاء مفتاح مشروع
+### Creating a Project Key
 
-1. أدخل اسم المشروع
-2. (اختياري) حدد الميزانية بالدولار
-3. (اختياري) حدد RPM و TPM
-4. انقر "إنشاء مفتاح"
-5. انسخ المفتاح فوراً (لن يظهر مرة أخرى)
+1. Enter project name
+2. (Optional) Set budget in USD
+3. (Optional) Set RPM and TPM limits
+4. Click "Create Key"
+5. Copy the key immediately (it won't appear again)
 
-### استخدام في التطبيقات
+### Using in Applications
 
 ```bash
-# تعيين متغيرات البيئة
+# Set environment variables
 export OPENAI_BASE_URL=http://127.0.0.1:8787/v1
 export OPENAI_API_KEY=sk-kp-<your-project-key>
 ```
 
-### مثال مع OpenAI SDK
+### Example with OpenAI SDK
 
 ```javascript
 import OpenAI from 'openai';
@@ -118,21 +118,21 @@ const client = new OpenAI({
 });
 
 const response = await client.chat.completions.create({
-  model: 'auto',  // سيختار أفضل نموذج تلقائياً
-  messages: [{ role: 'user', content: 'مرحباً!' }]
+  model: 'auto',  // Will auto-select best model
+  messages: [{ role: 'user', content: 'Hello!' }]
 });
 ```
 
-### اختيار نموذج محدد
+### Selecting a Specific Model
 
 ```javascript
 const response = await client.chat.completions.create({
-  model: 'groq/llama-3.3-70b-versatile',  // مزود/نموذج
-  messages: [{ role: 'user', content: 'مرحباً!' }]
+  model: 'groq/llama-3.3-70b-versatile',  // provider/model
+  messages: [{ role: 'user', content: 'Hello!' }]
 });
 ```
 
-## المزودون المدعومون
+## Supported Providers
 
 - Groq
 - OpenRouter
@@ -145,12 +145,12 @@ const response = await client.chat.completions.create({
 - Fireworks
 - HuggingFace
 
-## الميزانية والحدود
+## Budget and Limits
 
 ### Budget Tracking
 
 ```javascript
-// عند إنشاء مفتاح مشروع
+// When creating a project key
 await fetch('http://127.0.0.1:8787/admin/api/clients', {
   method: 'POST',
   headers: { 'Content-Type': 'application/json' },
@@ -177,82 +177,82 @@ await fetch('http://127.0.0.1:8787/admin/api/clients', {
 
 ## API Endpoints
 
-### إدارة المشاريع
+### Project Management
 
 ```bash
-# إنشاء مفتاح مشروع
+# Create project key
 POST /admin/api/clients
 Body: { name, budget?, rpmLimit?, tpmLimit? }
 
-# حذف مفتاح مشروع
+# Delete project key
 DELETE /admin/api/clients/:id
 
-# تحديث الحدود
+# Update limits
 PUT /admin/api/clients/:id
 Body: { budget?, rpmLimit?, tpmLimit? }
 
-# عرض سجلات الاستهلاك
+# View spend logs
 GET /admin/api/clients/:id/spend?limit=100&offset=0
 ```
 
-### إدارة المزودين
+### Provider Management
 
 ```bash
-# إضافة مزود
+# Add provider
 PUT /admin/api/providers/:name
 Body: { baseUrl, defaultModel? }
 
-# حذف مزود
+# Delete provider
 DELETE /admin/api/providers/:name
 
-# إضافة مفاتيح
+# Add keys
 POST /admin/api/providers/:name/keys
 Body: { keys: "key1,key2,key3" }
 
-# فحص النماذج
+# Scan models
 POST /admin/api/providers/:name/rescan
 ```
 
-## قاعدة البيانات
+## Database
 
-يستخدم المشروع SQLite لقاعدة البيانات:
+The project uses SQLite for the database:
 
-- الموقع: `./data/key-proxy.db`
-- الجداول:
-  - `providers`: معلومات المزودين
-  - `keys`: مفاتيح المزودين (مشفرة)
-  - `models`: النماذج المتاحة
-  - `clients`: مفاتيح المشاريع
-  - `spend_logs`: سجلات الاستهلاك
+- Location: `./data/key-proxy.db`
+- Tables:
+  - `providers`: Provider information
+  - `keys`: Provider keys (encrypted)
+  - `models`: Available models
+  - `clients`: Project keys
+  - `spend_logs`: Usage logs
 
-### النسخ الاحتياطي
+### Backup
 
 ```bash
-# نسخ قاعدة البيانات
+# Backup database
 cp data/key-proxy.db data/key-proxy-backup-$(date +%Y%m%d).db
 ```
 
-## الاختبارات
+## Testing
 
 ```bash
-# تشغيل الاختبارات
+# Run tests
 npm test
 
-# تشغيل بدون وضع المراقبة
+# Run without watch mode
 npm run test:run
 ```
 
-## الإنتاج
+## Production
 
-### التوصيات
+### Recommendations
 
-1. استخدم Reverse Proxy (nginx, Apache)
-2. فعّل HTTPS
-3. حدد MASTER_KEY قوي
-4. استخدم database backup دوري
-5. راقب logs الاستهلاك
+1. Use a reverse proxy (nginx, Apache)
+2. Enable HTTPS
+3. Set a strong MASTER_KEY
+4. Use regular database backups
+5. Monitor usage logs
 
-### مثال Nginx
+### Nginx Example
 
 ```nginx
 server {
@@ -270,13 +270,13 @@ server {
 }
 ```
 
-## استكشاف الأخطاء
+## Troubleshooting
 
 ### MASTER_KEY error
 ```bash
 Error: MASTER_KEY must be 64 hex chars
 ```
-الحل: تأكد من إنشاء مفتاح 64 hex char:
+Solution: Make sure you generated a 64 hex char key:
 ```bash
 openssl rand -hex 32
 ```
@@ -285,37 +285,37 @@ openssl rand -hex 32
 ```bash
 Error: listen EADDRINUSE: address already in use
 ```
-الحل:
+Solution:
 ```bash
-# ابحث عن العملية
+# Find the process
 lsof -ti:8787
 
-# أوقفها
+# Kill it
 kill <pid>
 ```
 
 ### Database locked
-إذا واجهت أخطاء في قاعدة البيانات:
+If you encounter database errors:
 ```bash
-# أوقف السيرفر
-# احذف ملفات WAL
+# Stop the server
+# Remove WAL files
 rm data/key-proxy.db-wal data/key-proxy.db-shm
-# أعد التشغيل
+# Restart
 ```
 
-## الترخيص
+## License
 
-ISC
+MIT
 
-## المساهمة
+## Contributing
 
-المساهمات مرحب بها! الرجاء:
-1. Fork المشروع
-2. إنشاء branch للميزة
-3. Commit التغييرات
-4. Push إلى Branch
-5. فتح Pull Request
+Contributions are welcome! Please:
+1. Fork the repository
+2. Create a feature branch
+3. Commit your changes
+4. Push to the branch
+5. Open a Pull Request
 
-## الدعم
+## Support
 
-للدعم والأسئلة، افتح issue في GitHub.
+For support and questions, open an issue on GitHub.

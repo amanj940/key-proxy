@@ -1,32 +1,32 @@
 ---
-name: 🐛 بلاغ عن خطأ
-about: أبلغ عن مشكلة في المشروع
+name: 🐛 Bug Report
+about: Report a problem in the project
 title: '[BUG] '
 labels: bug
 assignees: ''
 
 ---
 
-## وصف المشكلة
-وصف مختصر للمشكلة.
+## Describe the bug
+A short description of the problem.
 
-## كيفية التكرار
-الخطوات لإعادة إنتاج المشكلة:
-1. اذهب إلى '...'
-2. اضغط على '....'
-3. اسحب إلى '....'
-4. ارى الخطأ
+## To Reproduce
+Steps to reproduce the behavior:
+1. Go to '...'
+2. Click on '....'
+3. Scroll down to '....'
+4. See error
 
-## السلوك المتوقع
-ما الذي كنت تتوقعه أن يحدث؟
+## Expected behavior
+What you expected to happen?
 
-## السلوك الفعلي
-ما الذي حدث فعلاً؟
+## Actual behavior
+What actually happened?
 
-## لقطات شاشة
-إذا أمكن، أضف لقطات شاشة للمساعدة في تفسير المشكلة.
+## Screenshots
+If applicable, add screenshots to help explain your problem.
 
-## معلومات إضافية
-- نسخة Node.js:
-- نظام التشغيل:
-- إعدادات البيئة (.env):
+## Additional context
+- Node.js version:
+- Operating system:
+- Environment settings (.env):

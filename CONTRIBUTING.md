@@ -1,76 +1,76 @@
-# المساهمة في Key Proxy
+# Contributing to Key Proxy
 
-شكراً لاهتمامك بالمساهمة في Key Proxy!
+Thanks for your interest in contributing to Key Proxy!
 
-## كيفية المساهمة
+## How to Contribute
 
-### 1. Fork المشروع
+### 1. Fork the Repository
 
-اذهب إلى المشروع واضغط على زر "Fork" في الأعلى.
+Go to the repository and click the "Fork" button at the top.
 
-### 2. Clone منسخك
+### 2. Clone Your Fork
 
 ```bash
 git clone https://github.com/YOUR_USERNAME/key-proxy.git
 cd key-proxy
 ```
 
-### 3. إنشاء branch للميزة
+### 3. Create a Feature Branch
 
 ```bash
 git checkout -b feature/AmazingFeature
 ```
 
-### 4. Commit التغييرات
+### 4. Commit Your Changes
 
 ```bash
 git add .
 git commit -m 'Add some AmazingFeature'
 ```
 
-### 5. Push إلى Branch
+### 5. Push to the Branch
 
 ```bash
 git push origin feature/AmazingFeature
 ```
 
-### 6. فتح Pull Request
+### 6. Open a Pull Request
 
-اذهب إلى المشروع الأصلي وافتح Pull Request.
+Go to the original repository and open a Pull Request.
 
-## معايير الكود
+## Code Standards
 
-- استخدم **ESLint** إذا كان متاحاً
-- اتبع نمط الكود الموجود
-- أضف **اختبارات** للميزات الجديدة
-- تأكد أن جميع الاختبارات تمر: `npm test`
-- تأكد أن الكود يعمل على Node.js 18+
+- Use **ESLint** if available
+- Follow the existing code style
+- Add **tests** for new features
+- Ensure all tests pass: `npm test`
+- Ensure code works on Node.js 18+
 
-## إضافة ميزات جديدة
+## Adding New Features
 
-قبل إضافة ميزة كبيرة:
-1. افتح **Issue** لمناقشة الفكرة
-2. احصل على موافقة قبل البدء بالتنفيذ
-3. اتبع الهيكل الحالي للمشروع
+Before adding a major feature:
+1. Open an **Issue** to discuss the idea
+2. Get approval before starting implementation
+3. Follow the current project structure
 
-## الإبلاغ عن مشاكل
+## Reporting Issues
 
-استخدم قالب Issue للإبلاغ عن المشاكل. تأكد من:
-- وصف المشكلة بوضوح
-- إضافة خطوات التكرار
-- إضافة معلومات البيئة (Node.js version, OS)
-- إضافة logs أو لقطات شاشة إذا أمكن
+Use the issue template to report problems. Make sure to:
+- Describe the problem clearly
+- Add reproduction steps
+- Add environment information (Node.js version, OS)
+- Add logs or screenshots if possible
 
-## التوثيق
+## Documentation
 
-- تحديث README.md إذا أضفت ميزات جديدة
-- أضف تعليقات للكود المعقد
-- تأكد أن التوثيق بالعربية والإنجليزية إذا أمكن
+- Update README.md if you add new features
+- Add comments to complex code
+- Ensure documentation is in English if possible
 
-## ترخيص
+## License
 
-بالمساهمة، توافق على أن مساهماتك سترخيص تحت رخصة MIT.
+By contributing, you agree that your contributions will be licensed under the MIT License.
 
-## الدعم
+## Support
 
-إذا احتجت مساعدة، افتح Issue أو انضم إلى المناقشات.
+If you need help, open an issue or join the discussions.

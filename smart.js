@@ -20,7 +20,7 @@ const EXTRA = {
   fireworks: 'https://api.fireworks.ai/inference/v1',
   huggingface: 'https://router.huggingface.co/v1',
 };
-// نقاط نهاية تتطلب مفتاحاً فعلاً (قائمة /models عند OpenRouter عامة)
+// Endpoints that require a real key (/models list at OpenRouter is public)
 const VERIFY = { openrouter: '/auth/key' };
 const pub = new Map();
 
@@ -124,7 +124,7 @@ export function mountSmart(app, A) {
       if (!/^[\w.\-]{16,}$/.test(t) || seen.has(t)) continue;
       seen.add(t); items.push([t, hint]);
     }
-    if (!items.length) return res.json({ error: 'لم أجد أي مفتاح في النص' });
+    if (!items.length) return res.json({ error: 'No key found in text' });
     const results = [];
     for (let i = 0; i < items.length; i += 6)
       results.push(...await Promise.all(items.slice(i, i + 6).map(([k, h]) => handle(k, h, false))));

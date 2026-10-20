@@ -1,12 +1,12 @@
 <!doctype html>
-<html lang="ar" dir="rtl"><meta charset="utf-8">
+<html lang="en"><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Key Proxy</title>
 <style>
 :root{--bg:#f3f4f9;--card:#fff;--card2:#f6f7fb;--fg:#12141c;--mut:#6b7280;--bd:#e3e6ee;--ac:#6366f1;--ac2:#8b5cf6;--bad:#ef4444;--ok:#10b981;--warn:#f59e0b;--sh:0 12px 32px -14px rgba(30,41,59,.22)}
 @media(prefers-color-scheme:dark){:root{--bg:#090a0f;--card:#12141e;--card2:#181b29;--fg:#eceef7;--mut:#8b91a8;--bd:#232738;--sh:0 12px 32px -14px rgba(0,0,0,.7)}}
 *{box-sizing:border-box}
-body{margin:0;font:15px/1.5 "Segoe UI",Tahoma,system-ui,sans-serif;color:var(--fg);min-height:100vh;
+body{margin:0;font:15px/1.5 "Segoe UI",system-ui,sans-serif;color:var(--fg);min-height:100vh;
 background:radial-gradient(1100px 480px at 85% -10%,rgba(99,102,241,.2),transparent),radial-gradient(800px 380px at 0% 0%,rgba(139,92,246,.14),transparent),var(--bg)}
 .wrap{max-width:940px;margin:0 auto;padding:22px 16px 60px}
 .top{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
@@ -24,7 +24,7 @@ background:radial-gradient(1100px 480px at 85% -10%,rgba(99,102,241,.2),transpar
 .card{background:var(--card);border:1px solid var(--bd);border-radius:18px;padding:18px;margin:14px 0;box-shadow:var(--sh)}
 .card>h2{margin:0;font-size:17px}
 .card>.sub{margin:2px 0 12px;color:var(--mut);font-size:13px}
-input,textarea,select{background:var(--card2);color:var(--fg);border:1px solid var(--bd);border-radius:10px;padding:9px 11px;direction:ltr;font:inherit;flex:1;min-width:120px;outline:none;transition:border-color .15s,box-shadow .15s}
+input,textarea,select{background:var(--card2);color:var(--fg);border:1px solid var(--bd);border-radius:10px;padding:9px 11px;font:inherit;flex:1;min-width:120px;outline:none;transition:border-color .15s,box-shadow .15s}
 input:focus,textarea:focus,select:focus{border-color:var(--ac);box-shadow:0 0 0 3px rgba(99,102,241,.2)}
 textarea{width:100%;min-height:120px;font:13px/1.6 ui-monospace,Menlo,monospace;resize:vertical;border-style:dashed}
 textarea.drag{border-color:var(--ac);background:rgba(99,102,241,.08)}
@@ -80,7 +80,7 @@ code{direction:ltr;unicode-bidi:embed;word-break:break-all;font-family:ui-monosp
 <div class="wrap">
   <div class="top">
     <div class="logo">🔑</div>
-    <h1>Key Proxy<small>مفاتيح المزودين في مكان واحد · تدوير تلقائي · واجهة OpenAI</small></h1>
+    <h1>Key Proxy<small>Provider keys in one place · Auto rotation · OpenAI interface</small></h1>
     <span id="scan"></span>
   </div>
   <div class="tiles" id="tiles"></div>
@@ -97,7 +97,7 @@ const COL={groq:'#f55036',openrouter:'#7c3aed',gemini:'#2563eb',cerebras:'#0ea5e
 const color=n=>COL[n]||`hsl(${[...n].reduce((a,c)=>a*31+c.charCodeAt(0),7)%360} 62% 48%)`;
 async function api(m,p,b){
   const r=await fetch('/admin/api'+p,{method:m,headers:{'Content-Type':'application/json'},body:b?JSON.stringify(b):undefined});
-  if(r.status===401||r.status===403)throw new Error('مرفوض: افتح اللوحة من http://127.0.0.1:8787/admin');
+  if(r.status===401||r.status===403)throw new Error('Denied: Open the panel from http://127.0.0.1:8787/admin');
   return r.json();
 }
 function toast(msg,kind=''){const t=h('div',{class:'toast '+kind},msg);$('#toasts').append(t);setTimeout(()=>t.remove(),kind==='bad'?7000:3800)}
@@ -106,52 +106,52 @@ async function busy(btn,txt,fn,done){
   try{const r=await fn();if(r&&r.error)toast(r.error,'bad');else if(done)toast(done(r),'ok')}catch(e){toast(e.message,'bad')}
   await render();
 }
-const copy=async(t)=>{try{await navigator.clipboard.writeText(t);toast('تم النسخ','ok')}catch{toast('تعذر النسخ، انسخ يدوياً','bad')}};
+const copy=async(t)=>{try{await navigator.clipboard.writeText(t);toast('Copied','ok')}catch{toast('Copy failed, copy manually','bad')}};
 const st=(m)=>m.ok===true?'ok':m.ok===false?'bad':'unk';
 const kst=(k)=>k.status==='valid'?'ok':(k.status==='invalid'||k.status==='nocredit')?'bad':'unk';
-const ktxt=(k)=>k.status==='valid'?'سليم':k.status==='invalid'?'مرفوض':k.status==='nocredit'?'بلا رصيد':'غير موثّق';
+const ktxt=(k)=>k.status==='valid'?'Valid':k.status==='invalid'?'Invalid':k.status==='nocredit'?'No credit':'Unverified';
 
 async function addKeys(btn,ta){
   if(!ta.value.trim())return;
-  btn.disabled=true;btn.textContent='جارٍ الكشف والتحقق…';
+  btn.disabled=true;btn.textContent='Detecting and verifying…';
   try{
     const r=await api('POST','/keys/smart',{text:ta.value});
     if(r.error)toast(r.error,'bad');
     else{
       LAST=r.results;ta.value='';
       for(const n of new Set(r.results.filter(x=>x.status==='added').map(x=>x.provider)))OPEN.add(n);
-      toast('جارٍ فحص النماذج تلقائياً…','ok');
+      toast('Automatically scanning models…','ok');
     }
   }catch(e){toast(e.message,'bad')}
   render();
 }
 async function fullScan(btn){
   const ps=S.providers.filter(p=>p.keys.some(k=>!k.disabled));
-  if(!ps.length)return toast('لا توجد مفاتيح مفعّلة','bad');
+  if(!ps.length)return toast('No active keys','bad');
   btn.disabled=true;
   for(const p of ps){await api('POST',`/providers/${p.name}/verify`,{});await api('POST',`/providers/${p.name}/rescan`)}
-  toast('بدأ الفحص في الخلفية','ok');render();
+  toast('Scan started in background','ok');render();
 }
 function chip(r){
   const t={
-    added:`${r.provider} · …${r.tail} · `+(r.verified?'تم التحقق من المفتاح':'أُضيف لكن لم يُوثَّق بعد، سيُوثَّق عند فحص النماذج'),
-    duplicate:`…${r.tail} موجود مسبقاً في ${r.provider}`,
-    invalid:`…${r.tail} رفضه ${r.provider} (HTTP ${r.code||'؟'}) ولم يُحفظ`,
-    unknown:`…${r.tail} لم أعرف مزوده ولم يقبله أي مزود عندك. أضف المزود من «متقدم» ثم أعد اللصق`
+    added:`${r.provider} · …${r.tail} · `+(r.verified?'Key verified':'Added but not verified yet, will verify when scanning models'),
+    duplicate:`…${r.tail} already exists in ${r.provider}`,
+    invalid:`…${r.tail} rejected by ${r.provider} (HTTP ${r.code||'?'}) and not saved`,
+    unknown:`…${r.tail} provider unknown and not accepted by any of your providers. Add provider from "Advanced" then paste again`
   }[r.status];
   return h('div',{class:'chip '+r.status},{added:'✅',duplicate:'♻️',invalid:'❌',unknown:'❓'}[r.status],t);
 }
 
 function keysTab(p){
-  const vb=h('button',{class:'ghost sm'},'فحص كل المفاتيح');
-  vb.onclick=()=>busy(vb,'جارٍ الفحص…',()=>api('POST',`/providers/${p.name}/verify`,{}),r=>`سليم: ${r.results.filter(x=>x.state==='valid').length} · مرفوض: ${r.results.filter(x=>x.state==='invalid').length}`);
+  const vb=h('button',{class:'ghost sm'},'Check all keys');
+  vb.onclick=()=>busy(vb,'Checking…',()=>api('POST',`/providers/${p.name}/verify`,{}),r=>`Valid: ${r.results.filter(x=>x.state==='valid').length} · Invalid: ${r.results.filter(x=>x.state==='invalid').length}`);
   return h('div',{},h('div',{class:'row'},vb),
     ...p.keys.map(k=>{
-      const v=h('button',{class:'ghost sm'},'فحص');v.onclick=()=>busy(v,'…',()=>api('POST',`/providers/${p.name}/verify`,{id:k.id}),r=>ktxt({status:r.results[0]?.state==='valid'?'valid':r.results[0]?.state==='invalid'?'invalid':''}));
-      const tg=h('button',{class:'ghost sm'},k.disabled?'تفعيل':'إيقاف');tg.onclick=()=>busy(tg,'…',()=>api('POST',`/providers/${p.name}/keys/${k.id}/toggle`));
-      const rm=h('button',{class:'bad sm'},'حذف');rm.onclick=()=>busy(rm,'…',()=>api('DELETE',`/providers/${p.name}/keys/${k.id}`));
+      const v=h('button',{class:'ghost sm'},'Check');v.onclick=()=>busy(v,'…',()=>api('POST',`/providers/${p.name}/verify`,{id:k.id}),r=>ktxt({status:r.results[0]?.state==='valid'?'valid':r.results[0]?.state==='invalid'?'invalid':''}));
+      const tg=h('button',{class:'ghost sm'},k.disabled?'Enable':'Disable');tg.onclick=()=>busy(tg,'…',()=>api('POST',`/providers/${p.name}/keys/${k.id}/toggle`));
+      const rm=h('button',{class:'bad sm'},'Delete');rm.onclick=()=>busy(rm,'…',()=>api('DELETE',`/providers/${p.name}/keys/${k.id}`));
       return h('div',{class:'item'},h('i',{class:'dot '+kst(k)}),h('code',{},'…'+k.tail),h('span',{class:'tag'},ktxt(k)),
-        h('span',{class:'grow'},`${k.used} طلب · ${k.errors} خطأ`+(k.cooldown?` · موقوف ${k.cooldown}ث`:'')+(k.disabled?' · معطّل':'')),v,tg,rm);
+        h('span',{class:'grow'},`${k.used} requests · ${k.errors} errors`+(k.cooldown?` · cooldown ${k.cooldown}s`:'')+(k.disabled?' · disabled':'')),v,tg,rm);
     }));
 }
 function modelsTab(p){
@@ -159,28 +159,28 @@ function modelsTab(p){
   const good=all.filter(([,m])=>m.ok===true).sort((a,b)=>a[0].localeCompare(b[0]));
   const unk=all.filter(([,m])=>m.ok==null).sort((a,b)=>a[0].localeCompare(b[0]));
   const chat=(l)=>l.filter(([,m])=>m.type==='chat').map(([id])=>id);
-  const opts=[...chat(good).map(id=>[id,id]),...chat(unk).map(id=>[id,id+' (غير مؤكد)'])];
-  if(p.defaultModel&&!opts.some(([id])=>id===p.defaultModel))opts.unshift([p.defaultModel,p.defaultModel+' (غير مفحوص)']);
-  const sel=h('select',{},h('option',{value:''},'— اختر النموذج الافتراضي —'),
+  const opts=[...chat(good).map(id=>[id,id]),...chat(unk).map(id=>[id,id+' (unconfirmed)'])];
+  if(p.defaultModel&&!opts.some(([id])=>id===p.defaultModel))opts.unshift([p.defaultModel,p.defaultModel+' (untested)']);
+  const sel=h('select',{},h('option',{value:''},'— Select default model —'),
     ...opts.map(([id,t])=>h('option',{value:id,selected:id===p.defaultModel},t)));
-  sel.onchange=async()=>{const v=sel.value;try{await api('PUT','/providers/'+p.name,{defaultModel:v});toast(v?'تم تثبيت الافتراضي: '+v:'أُلغي التثبيت','ok')}catch(e){toast(e.message,'bad')}render()};
-  const rs=h('button',{class:'ghost'},p.scanning?'جارٍ الفحص…':'إعادة الفحص');rs.disabled=!!p.scanning;
-  rs.onclick=()=>busy(rs,'…',()=>api('POST',`/providers/${p.name}/rescan`),()=>'بدأ الفحص في الخلفية');
+  sel.onchange=async()=>{const v=sel.value;try{await api('PUT','/providers/'+p.name,{defaultModel:v});toast(v?'Default set: '+v:'Default unset','ok')}catch(e){toast(e.message,'bad')}render()};
+  const rs=h('button',{class:'ghost'},p.scanning?'Scanning…':'Rescan');rs.disabled=!!p.scanning;
+  rs.onclick=()=>busy(rs,'…',()=>api('POST',`/providers/${p.name}/rescan`),()=>'Scan started in background');
   const row=([id,m])=>{
     const cb=h('input',{type:'checkbox',checked:m.enabled!==false});cb.onchange=()=>api('POST',`/providers/${p.name}/models/set`,{id,enabled:cb.checked});
     return h('div',{class:'item'},h('i',{class:'dot '+st(m)}),h('code',{},id),h('span',{class:'tag'},m.type),h('span',{class:'grow'},m.err||''),h('label',{class:'sw'},cb,h('i')));
   };
-  const when=p.scannedAt?'آخر فحص: '+new Date(p.scannedAt).toLocaleString('ar'):'لم يُفحص بعد';
+  const when=p.scannedAt?'Last scan: '+new Date(p.scannedAt).toLocaleString('en'):'Not scanned yet';
   return h('div',{},h('div',{class:'row'},sel,rs),
     p.note?h('div',{class:'chip unknown'},'⚠️ '+p.note):null,
-    h('p',{class:'mut',style:'font-size:12.5px;margin:4px 0'},(p.scanning?'⏳ يجري الفحص التلقائي… ':'')+when+(p.locked?' · الافتراضي مثبّت':'')),
-    ...(good.length?good.map(row):[h('p',{class:'mut'},p.scanning?'يجري اكتشاف النماذج التي تعمل مع مفاتيحك…':(p.note?'':'لا توجد نماذج سليمة بعد.'))]),
-    unk.length?h('details',{style:'margin-top:10px'},h('summary',{class:'mut'},`غير مؤكدة (${unk.length}): حد طلبات أو مهلة`),...unk.map(row)):null);
+    h('p',{class:'mut',style:'font-size:12.5px;margin:4px 0'},(p.scanning?'⏳ Auto scanning… ':'')+when+(p.locked?' · Default pinned':'')),
+    ...(good.length?good.map(row):[h('p',{class:'mut'},p.scanning?'Discovering models that work with your keys…':(p.note?'':'No valid models yet.'))]),
+    unk.length?h('details',{style:'margin-top:10px'},h('summary',{class:'mut'},`Unconfirmed (${unk.length}): rate limit or timeout`),...unk.map(row)):null);
 }
 function settingsTab(p){
   const url=h('input',{value:p.baseUrl||''}),mdl=h('input',{value:p.defaultModel||'',placeholder:'default model'});
-  const sv=h('button',{},'حفظ');sv.onclick=()=>busy(sv,'…',()=>api('PUT','/providers/'+p.name,{baseUrl:url.value,defaultModel:mdl.value}),()=>'تم الحفظ');
-  const del=h('button',{class:'bad'},'حذف المزود');del.onclick=()=>{if(confirm('حذف '+p.name+' بكل مفاتيحه؟'))busy(del,'…',()=>api('DELETE','/providers/'+p.name))};
+  const sv=h('button',{},'Save');sv.onclick=()=>busy(sv,'…',()=>api('PUT','/providers/'+p.name,{baseUrl:url.value,defaultModel:mdl.value}),()=>'Saved');
+  const del=h('button',{class:'bad'},'Delete provider');del.onclick=()=>{if(confirm('Delete '+p.name+' with all its keys?'))busy(del,'…',()=>api('DELETE','/providers/'+p.name))};
   return h('div',{},h('div',{class:'row'},url,mdl),h('div',{class:'row'},sv,del));
 }
 function provider(p){
@@ -189,16 +189,16 @@ function provider(p){
   const badk=p.keys.filter(k=>k.status==='invalid').length;
   const body=h('div',{class:'pbody'});
   const draw=()=>{
-    const tabs=h('div',{class:'tabs'},...[['keys','المفاتيح'],['models','النماذج'],['set','الإعدادات']].map(([k,t])=>{const b=h('button',{class:'tab'+(u.tab===k?' on':'')},t);b.onclick=()=>{u.tab=k;draw()};return b}));
+    const tabs=h('div',{class:'tabs'},...[['keys','Keys'],['models','Models'],['set','Settings']].map(([k,t])=>{const b=h('button',{class:'tab'+(u.tab===k?' on':'')},t);b.onclick=()=>{u.tab=k;draw()};return b}));
     body.replaceChildren(tabs,u.tab==='keys'?keysTab(p):u.tab==='models'?modelsTab(p):settingsTab(p));
   };
   draw();
   const d=h('details',{class:'prov'},
     h('summary',{},h('div',{class:'av',style:'background:'+color(p.name)},p.name[0]),h('b',{},p.name),
-      badk?h('span',{class:'pill bad'},badk+' مرفوض'):null,
-      p.keys.length&&p.keys.every(k=>k.status==='nocredit')?h('span',{class:'pill bad'},'بلا رصيد'):null,
-      h('span',{class:'pill'},p.keys.length+' مفتاح'),
-      h('span',{class:'pill'+(okc?' ok':'')},ms.length?okc+' نموذج يعمل':'لم تُفحص')),body);
+      badk?h('span',{class:'pill bad'},badk+' invalid'):null,
+      p.keys.length&&p.keys.every(k=>k.status==='nocredit')?h('span',{class:'pill bad'},'no credit'):null,
+      h('span',{class:'pill'},p.keys.length+' keys'),
+      h('span',{class:'pill'+(okc?' ok':'')},ms.length?okc+' working model':'not scanned')),body);
   if(OPEN.has(p.name))d.open=true;
   d.addEventListener('toggle',()=>d.open?OPEN.add(p.name):OPEN.delete(p.name));
   return d;
@@ -209,43 +209,43 @@ async function render(){
   const withKeys=S.providers.filter(p=>p.keys.length),without=S.providers.filter(p=>!p.keys.length);
   const tk=S.providers.reduce((a,p)=>a+p.keys.filter(k=>!k.disabled).length,0);
   const okm=S.providers.reduce((a,p)=>a+Object.values(p.models||{}).filter(m=>m.type==='chat'&&m.ok===true).length,0);
-  $('#tiles').replaceChildren(...[[tk,'مفتاح مفعّل'],[withKeys.length,'مزود'],[okm,'نموذج سليم']].map(([n,t])=>h('div',{class:'tile'},h('b',{},String(n)),h('span',{},t))));
-  const sc=h('button',{},'⚡ فحص شامل');sc.onclick=()=>fullScan(sc);$('#scan').replaceChildren(sc);
+  $('#tiles').replaceChildren(...[[tk,'active keys'],[withKeys.length,'providers'],[okm,'valid models']].map(([n,t])=>h('div',{class:'tile'},h('b',{},String(n)),h('span',{},t))));
+  const sc=h('button',{},'⚡ Full scan');sc.onclick=()=>fullScan(sc);$('#scan').replaceChildren(sc);
 
-  const ta=h('textarea',{placeholder:'الصق مفاتيح من أي مزود (مفتاح بكل سطر) أو انسخ ملف .env كاملاً، أو اسحب الملف وأفلته هنا'});
+  const ta=h('textarea',{placeholder:'Paste keys from any provider (one key per line) or copy a full .env file, or drag and drop file here'});
   ta.ondragover=(e)=>{e.preventDefault();ta.classList.add('drag')};ta.ondragleave=()=>ta.classList.remove('drag');
   ta.ondrop=async(e)=>{e.preventDefault();ta.classList.remove('drag');const f=e.dataTransfer.files[0];if(f)ta.value+=(ta.value?'\n':'')+await f.text()};
-  const add=h('button',{},'كشف وإضافة');add.onclick=()=>addKeys(add,ta);
-  app.append(h('section',{class:'card'},h('h2',{},'إضافة مفاتيح المزودين'),
-    h('p',{class:'sub'},'خانة واحدة لكل المزودين. يُكتشف المزود تلقائياً ويُتحقق من كل مفتاح فعلياً قبل حفظه.'),
+  const add=h('button',{},'Detect and add');add.onclick=()=>addKeys(add,ta);
+  app.append(h('section',{class:'card'},h('h2',{},'Add provider keys'),
+    h('p',{class:'sub'},'One box for all providers. Provider is auto-detected and each key is verified before saving.'),
     ta,h('div',{class:'row'},add),LAST.length?h('div',{class:'chips'},...LAST.map(chip)):null));
 
-  const nm=h('input',{placeholder:'اسم المشروع'});
+  const nm=h('input',{placeholder:'Project name'});
   const out=h('div',{});
-  const mk=h('button',{},'إنشاء مفتاح');
+  const mk=h('button',{},'Create key');
   mk.onclick=async()=>{
     if(!nm.value.trim())return;
     const r=await api('POST','/clients',{name:nm.value});
     await render();
-    $('#newkey').replaceChildren(h('div',{class:'newkey'},h('b',{},'انسخ المفتاح الآن، لن يظهر مرة ثانية'),h('code',{},r.key),h('button',{class:'sm',onclick:()=>copy(r.key)},'نسخ')))
+    $('#newkey').replaceChildren(h('div',{class:'newkey'},h('b',{},'Copy the key now, it will not appear again'),h('code',{},r.key),h('button',{class:'sm',onclick:()=>copy(r.key)},'Copy')))
   };
-  app.append(h('section',{class:'card'},h('h2',{},'مفاتيح المشاريع'),
-    h('p',{class:'sub'},'أعطِ كل مشروع مفتاحاً مستقلاً بدل مفاتيح المزودين. إن انكشف احذفه فقط.'),
+  app.append(h('section',{class:'card'},h('h2',{},'Project keys'),
+    h('p',{class:'sub'},'Give each project its own key instead of provider keys. If leaked, just delete it.'),
     h('div',{class:'row'},nm,mk),h('div',{id:'newkey'}),
-    S.clients.length?h('table',{},h('tr',{},...['الاسم','المفتاح','الطلبات',''].map(x=>h('th',{},x))),
-      ...S.clients.map(c=>{const b=h('button',{class:'bad sm'},'حذف');b.onclick=()=>{if(confirm('حذف هذا المفتاح؟'))busy(b,'…',()=>api('DELETE','/clients/'+c.id))};
+    S.clients.length?h('table',{},h('tr',{},...['Name','Key','Requests',''].map(x=>h('th',{},x))),
+      ...S.clients.map(c=>{const b=h('button',{class:'bad sm'},'Delete');b.onclick=()=>{if(confirm('Delete this key?'))busy(b,'…',()=>api('DELETE','/clients/'+c.id))};
         return h('tr',{},h('td',{},c.name),h('td',{},h('code',{},c.prefix)),h('td',{},String(c.used||0)),h('td',{},b))})):null,
-    h('div',{class:'row mut',style:'font-size:13px'},'للربط في أي مشروع:',h('code',{},'OPENAI_BASE_URL=http://127.0.0.1:8787/v1'),
-      h('button',{class:'ghost sm',onclick:()=>copy('OPENAI_BASE_URL=http://127.0.0.1:8787/v1')},'نسخ'))));
+    h('div',{class:'row mut',style:'font-size:13px'},'To connect in any project:',h('code',{},'OPENAI_BASE_URL=http://127.0.0.1:8787/v1'),
+      h('button',{class:'ghost sm',onclick:()=>copy('OPENAI_BASE_URL=http://127.0.0.1:8787/v1')},'Copy'))));
 
-  app.append(h('section',{class:'card'},h('h2',{},'المزودون'),h('p',{class:'sub'},'افتح أي مزود لإدارة مفاتيحه ونماذجه.'),
-    ...(withKeys.length?withKeys.map(provider):[h('p',{class:'mut'},'لا توجد مفاتيح بعد. الصقها في الأعلى.')]),
-    without.length?h('details',{style:'margin-top:12px'},h('summary',{class:'mut'},`مزودون بلا مفاتيح (${without.length})`),
+  app.append(h('section',{class:'card'},h('h2',{},'Providers'),h('p',{class:'sub'},'Open any provider to manage its keys and models.'),
+    ...(withKeys.length?withKeys.map(provider):[h('p',{class:'mut'},'No keys yet. Paste them above.')]),
+    without.length?h('details',{style:'margin-top:12px'},h('summary',{class:'mut'},`Providers without keys (${without.length})`),
       h('div',{class:'row'},...without.map(p=>h('span',{class:'pill'},p.name)))):null));
 
-  const cn=h('input',{placeholder:'name'}),cu=h('input',{placeholder:'https://.../v1'}),cm=h('input',{placeholder:'default model (اختياري)'});
-  const ab=h('button',{},'إضافة');ab.onclick=()=>busy(ab,'…',()=>api('PUT','/providers/'+cn.value.trim().toLowerCase(),{baseUrl:cu.value,defaultModel:cm.value}));
-  app.append(h('details',{class:'card'},h('summary',{},'متقدم: إضافة مزود آخر متوافق مع OpenAI'),h('div',{class:'row'},cn,cu,cm,ab)));
+  const cn=h('input',{placeholder:'name'}),cu=h('input',{placeholder:'https://.../v1'}),cm=h('input',{placeholder:'default model (optional)'});
+  const ab=h('button',{},'Add');ab.onclick=()=>busy(ab,'…',()=>api('PUT','/providers/'+cn.value.trim().toLowerCase(),{baseUrl:cu.value,defaultModel:cm.value}));
+  app.append(h('details',{class:'card'},h('summary',{},'Advanced: Add another OpenAI-compatible provider'),h('div',{class:'row'},cn,cu,cm,ab)));
 }
 render();
 setInterval(()=>{if(S&&S.providers.some(p=>p.scanning)&&!document.activeElement?.matches('textarea,input,select'))render()},5000);
