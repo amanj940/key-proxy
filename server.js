@@ -357,31 +357,7 @@ app.use(A, (req, res, next) => {
   next();
 });
 app.use('/admin', (req, res, next) => {
-  const host = String(req.headers.host || '').replace(/:\d+$/, '');
-  const adminToken = process.env.ADMIN_TOKEN || '';
-  const providedToken = req.query.token || req.headers['x-admin-token'] || '';
-
-  // السماح بالوصول إذا كان HOST محلياً
-  if (['127.0.0.1', 'localhost', '[::1]'].includes(host)) {
-    return next();
-  }
-  
-  // التحقق من JWT token (طريقة جديدة)
-  const authHeader = req.headers.authorization;
-  const jwtToken = authHeader && authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null;
-  
-  if (jwtToken) {
-    const verification = verifyToken(jwtToken);
-    if (verification.success) {
-      req.user = verification.user;
-      return next();
-    }
-  }
-  
-  // التحقق من ADMIN_TOKEN (طريقة قديمة للتوافق)
-  if (!adminToken || providedToken !== adminToken) {
-    return res.status(403).json({ error: 'forbidden host - requires valid admin token' });
-  }
+  // السماح بتحميل الصفحة بدون token - التحقق يتم في JavaScript
   next();
 }, express.static(fileURLToPath(new URL('./public', import.meta.url)), { index: 'admin.html' }));
 
