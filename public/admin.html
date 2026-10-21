@@ -331,7 +331,7 @@ async function render(){
 
   app.append(h('section',{class:'card'},h('h2',{},window.t('providers.title')),h('p',{class:'sub'},window.t('providers.subtitle')),
     ...(withKeys.length?withKeys.map(provider):[h('p',{class:'mut'},window.t('providers.noKeys'))]),
-    without.length?h('details',{style:'margin-top:12px'},h('summary',{class:'mut'},window.t('providers.withoutKeys')+' ('+without.length+')'),
+    without.length?h('details',{style:'margin-top:12px'},h('summary',{class:'mut'},window.t('providers.withoutKeys')+' ('+String(without.length)+')'),
       h('div',{class:'row'},...without.map(p=>h('span',{class:'pill'},p.name)))):null));
 
   // Analytics Section
@@ -359,8 +359,8 @@ async function render(){
       const metrics=await api('GET','/metrics');
       const total=metrics.metrics.reduce((a,m)=>a+m.total_requests,0);
       const cost=metrics.metrics.reduce((a,m)=>a+m.total_cost,0);
-      const avgLat=metrics.metrics.reduce((a,m)=>a+m.avg_latency,0)/metrics.metrics.length||0;
-      const successRate=metrics.metrics.reduce((a,m)=>a+m.success_count,0)/total||0;
+      const avgLat=metrics.metrics.length>0 ? metrics.metrics.reduce((a,m)=>a+m.avg_latency,0)/metrics.metrics.length : 0;
+      const successRate=total>0 ? metrics.metrics.reduce((a,m)=>a+m.success_count,0)/total : 0;
       const topModels=[...metrics.metrics].sort((a,b)=>b.total_requests-a.total_requests).slice(0,5);
       const topProviders=[...metrics.metrics].sort((a,b)=>b.total_requests-a.total_requests).slice(0,5);
 
