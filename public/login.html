@@ -146,29 +146,42 @@
       margin-bottom: 15px;
       text-align: center;
     }
+    .language-toggle {
+      position: fixed;
+      top: 18px;
+      inset-inline-end: 18px;
+      width: auto;
+      margin: 0;
+      padding: 8px 14px;
+      background: var(--card);
+      color: var(--fg);
+      border: 1px solid var(--bd);
+      box-shadow: none;
+    }
   </style>
 </head>
-<body>
+<body data-title-key="login.title">
+  <button id="languageToggle" class="language-toggle" type="button">English</button>
   <div class="card">
     <h1>🔑 Key Proxy</h1>
-    <p class="subtitle">تسجيل الدخول</p>
+    <p class="subtitle" data-i18n="login.subtitle">تسجيل الدخول</p>
     
     <div id="message"></div>
     
     <div class="form-group">
-      <label>اسم المستخدم</label>
-      <input type="text" id="username" placeholder="أدخل اسم المستخدم">
+      <label data-i18n="login.username">اسم المستخدم</label>
+      <input type="text" id="username" data-i18n-placeholder="login.usernamePlaceholder" placeholder="أدخل اسم المستخدم">
     </div>
     
     <div class="form-group">
-      <label>كلمة المرور</label>
-      <input type="password" id="password" placeholder="أدخل كلمة المرور">
+      <label data-i18n="login.password">كلمة المرور</label>
+      <input type="password" id="password" data-i18n-placeholder="login.passwordPlaceholder" placeholder="أدخل كلمة المرور">
     </div>
     
-    <button id="loginBtn" onclick="login()">تسجيل الدخول</button>
+    <button id="loginBtn" onclick="login()" data-i18n="login.submit">تسجيل الدخول</button>
     
     <div class="toggle">
-      ليس لديك حساب؟ <a href="/register.html">إنشاء حساب جديد</a>
+      <span data-i18n="login.noAccount">ليس لديك حساب؟</span> <a href="/register.html" data-i18n="login.registerLink">إنشاء حساب جديد</a>
     </div>
   </div>
 
@@ -180,12 +193,16 @@
       const message = document.getElementById('message');
       
       if (!username || !password) {
-        message.innerHTML = '<div class="error">الرجاء إدخال اسم المستخدم وكلمة المرور</div>';
+        message.textContent = '';
+        const error = document.createElement('div');
+        error.className = 'error';
+        error.textContent = window.pageT('login.missingFields');
+        message.append(error);
         return;
       }
       
       btn.disabled = true;
-      btn.textContent = 'جاري تسجيل الدخول...';
+      btn.textContent = window.pageT('login.loading');
       
       try {
         const response = await fetch('/api/auth/login', {
@@ -199,19 +216,28 @@
         if (data.success) {
           localStorage.setItem('keyproxy_token', data.token);
           localStorage.setItem('keyproxy_user', JSON.stringify(data.user));
-          message.innerHTML = '<div class="success">تم تسجيل الدخول بنجاح! جاري التحويل...</div>';
+          const success = document.createElement('div');
+          success.className = 'success';
+          success.textContent = window.pageT('login.loginSuccess');
+          message.replaceChildren(success);
           setTimeout(() => {
             window.location.href = '/admin';
           }, 1000);
         } else {
-          message.innerHTML = '<div class="error">' + data.message + '</div>';
+          const error = document.createElement('div');
+          error.className = 'error';
+          error.textContent = data.message;
+          message.replaceChildren(error);
         }
       } catch (error) {
-        message.innerHTML = '<div class="error">حدث خطأ: ' + error.message + '</div>';
+        const errorMessage = document.createElement('div');
+        errorMessage.className = 'error';
+        errorMessage.textContent = window.pageT('login.errorPrefix') + error.message;
+        message.replaceChildren(errorMessage);
       }
       
       btn.disabled = false;
-      btn.textContent = 'تسجيل الدخول';
+      btn.textContent = window.pageT('login.submit');
     }
     
     // Check if already logged in
@@ -220,5 +246,6 @@
       window.location.href = '/admin';
     }
   </script>
+  <script src="/language.js"></script>
 </body>
 </html>

@@ -8,6 +8,8 @@ import { mountModels, autoModels } from './models-api.js';
 import { mountSmart } from './smart.js';
 import { startAuto } from './auto.js';
 import { classify } from './models-api.js';
+import { validateModelAccess, normalizeModelPolicy, hasModelQuotaRemaining, isModelAllowed, rankModelsForRequest as rankPolicyModels } from './routing-policy.js';
+import { calculateUsageCost, estimatePromptTokens, extractUsage } from './usage-meter.js';
 
 const app = express();
 app.disable('x-powered-by');
@@ -38,40 +40,34 @@ const KEY_SELECTION = {
   geographic: 'based on location'
 };
 
-// Calculate model score
-function calculateModelScore(metrics) {
-  if (!metrics) return 0.5;
+function rankModelsForRequest(models, strategy, client, options = {}) {
+  if (!models?.length || !client) return [];
 
-  const latencyScore = metrics.avg_latency_ms > 0 ? Math.max(0, 1 - (metrics.avg_latency_ms / 2000)) : 0.5;
-  const costScore = metrics.cost_per_1k_input > 0 ? Math.max(0, 1 - (metrics.cost_per_1k_input / 0.01)) : 0.5;
-  const qualityScore = metrics.success_rate || 0.5;
-  const reliabilityScore = qualityScore;
-
-  // Weighted scoring: speed (30%), cost (30%), quality (25%), reliability (15%)
-  return (latencyScore * 0.3) + (costScore * 0.3) + (qualityScore * 0.25) + (reliabilityScore * 0.15);
-}
-
-// Select model based on strategy
-function selectModelForRequest(models, strategy = 'balanced') {
-  if (!models || models.length === 0) return null;
-
-  const modelsWithMetrics = models.map(model => {
-    const metrics = getModelMetrics(model.id, model.provider || model.name);
-    const score = calculateModelScore(metrics);
-    return { ...model, metrics, score };
-  });
-
-  switch (strategy) {
-    case 'fastest':
-      return modelsWithMetrics.sort((a, b) => (a.metrics?.avg_latency_ms || 9999) - (b.metrics?.avg_latency_ms || 9999))[0];
-    case 'cheapest':
-      return modelsWithMetrics.sort((a, b) => (a.metrics?.cost_per_1k_input || 999) - (b.metrics?.cost_per_1k_input || 999))[0];
-    case 'best_quality':
-      return modelsWithMetrics.sort((a, b) => (b.metrics?.success_rate || 0) - (a.metrics?.success_rate || 0))[0];
-    case 'balanced':
-    default:
-      return modelsWithMetrics.sort((a, b) => b.score - a.score)[0];
+  const modelByName = new Map();
+  const metrics = {};
+  const usage = {};
+  for (const model of models) {
+    const provider = model.provider || model.name;
+    const modelId = model.id;
+    if (!provider || !modelId) continue;
+    const fullModelId = `${provider}/${modelId}`;
+    modelByName.set(fullModelId, { provider, id: modelId, name: provider });
+    metrics[fullModelId] = getModelMetrics(modelId, provider) || {};
+    const snapshot = getModelUsageSnapshot(client, fullModelId);
+    usage[fullModelId] = {
+      rpm: snapshot.rpm_used,
+      tpm: snapshot.tpm_used,
+      rpd: snapshot.rpd_used
+    };
   }
+
+  return rankPolicyModels(client, [...modelByName.keys()], {
+    strategy,
+    metrics,
+    usage,
+    taskType: options.taskType || options.task_type || 'chat',
+    priority: options.priority || options.routing_priority || 'medium'
+  }).map((modelId) => modelByName.get(modelId));
 }
 
 // Select key based on health
@@ -135,6 +131,8 @@ function checkQuotas(client, model = null) {
   const now = Date.now();
   const dayStart = Math.floor(now / 86400000) * 86400000;
   const hourStart = Math.floor(now / 3600000) * 3600000;
+  const minuteStart = Math.floor(now / 60000) * 60000;
+  const parsedModelQuotas = normalizeModelPolicy(client).model_quotas;
 
   // Check monthly budget
   if (client.monthly_budget && client.spend >= client.monthly_budget) {
@@ -144,7 +142,7 @@ function checkQuotas(client, model = null) {
   // Check daily budget
   if (client.daily_budget) {
     const dailySpend = getAggregatedMetrics({ clientId: client.id, from: dayStart })
-      .reduce((sum, m) => sum + m.total_cost, 0);
+      .reduce((sum, m) => sum + Number(m.total_cost || 0), 0);
     if (dailySpend >= client.daily_budget) {
       return { allowed: false, reason: 'daily_budget_exceeded' };
     }
@@ -153,7 +151,7 @@ function checkQuotas(client, model = null) {
   // Check hourly budget
   if (client.hourly_budget) {
     const hourlySpend = getAggregatedMetrics({ clientId: client.id, from: hourStart })
-      .reduce((sum, m) => sum + m.total_cost, 0);
+      .reduce((sum, m) => sum + Number(m.total_cost || 0), 0);
     if (hourlySpend >= client.hourly_budget) {
       return { allowed: false, reason: 'hourly_budget_exceeded' };
     }
@@ -169,15 +167,23 @@ function checkQuotas(client, model = null) {
   }
 
   // Check model-specific quotas
-  if (client.model_quotas && model) {
-    const modelQuotas = JSON.parse(client.model_quotas);
-    if (modelQuotas[model]) {
-      const quota = modelQuotas[model];
-      const modelMetrics = getAggregatedMetrics({ clientId: client.id });
-      const modelUsage = modelMetrics.filter(m => m.model === model).reduce((sum, m) => sum + m.total_requests, 0);
+  if (model && parsedModelQuotas && Object.keys(parsedModelQuotas).length > 0) {
+    const quota = parsedModelQuotas[model] || parsedModelQuotas[model.replace(/^\w+\//, '')] || null;
+    if (quota) {
+      const minuteMetrics = getAggregatedMetrics({ clientId: client.id, model, from: minuteStart });
+      const dayMetrics = getAggregatedMetrics({ clientId: client.id, model, from: dayStart });
+      const minuteRequests = minuteMetrics.reduce((sum, m) => sum + Number(m.total_requests || 0), 0);
+      const minuteTokens = minuteMetrics.reduce((sum, m) => sum + Number(m.total_tokens || 0), 0);
+      const dayRequests = dayMetrics.reduce((sum, m) => sum + Number(m.total_requests || 0), 0);
 
-      if (quota.rpm && modelUsage >= quota.rpm) {
-        return { allowed: false, reason: 'model_rpm_exceeded' };
+      const quotaCheck = hasModelQuotaRemaining(client, model, {
+        rpm: minuteRequests,
+        tpm: minuteTokens,
+        rpd: dayRequests
+      });
+
+      if (!quotaCheck.allowed) {
+        return { allowed: false, reason: quotaCheck.reason };
       }
     }
   }
@@ -185,71 +191,45 @@ function checkQuotas(client, model = null) {
   return { allowed: true };
 }
 
-// Rate limiting counters
-const rateLimit = new Map(); // clientId -> { rpm: { timestamp, count }, tpm: { timestamp, count }, tpd: { timestamp, count } }
-
 function checkRateLimit(client, estimatedTokens = 0) {
   const now = Date.now();
-  const minute = Math.floor(now / 60000);
-  const day = Math.floor(now / 86400000);
+  const minuteStart = Math.floor(now / 60000) * 60000;
+  const metrics = getAggregatedMetrics({ clientId: client.id, from: minuteStart });
+  const requestCount = metrics.reduce((sum, item) => sum + Number(item.total_requests || 0), 0);
+  const tokenCount = metrics.reduce((sum, item) => sum + Number(item.total_tokens || 0), 0);
 
-  if (!rateLimit.has(client.id)) {
-    rateLimit.set(client.id, { rpm: { timestamp: minute, count: 0 }, tpm: { timestamp: minute, count: 0 }, tpd: { timestamp: day, count: 0 } });
-  }
-
-  const limits = rateLimit.get(client.id);
-
-  // Check RPM
   if (client.rpmLimit > 0) {
-    if (limits.rpm.timestamp !== minute) {
-      limits.rpm = { timestamp: minute, count: 0 };
-    }
-    if (limits.rpm.count >= client.rpmLimit) {
-      return { allowed: false, reason: 'rpm_limit', resetAt: (minute + 1) * 60000 };
+    if (requestCount >= client.rpmLimit) {
+      return { allowed: false, reason: 'rpm_limit', resetAt: minuteStart + 60000 };
     }
   }
 
-  // Check TPM
   if (client.tpmLimit > 0) {
-    if (limits.tpm.timestamp !== minute) {
-      limits.tpm = { timestamp: minute, count: 0 };
-    }
-    if (limits.tpm.count + estimatedTokens > client.tpmLimit) {
-      return { allowed: false, reason: 'tpm_limit', resetAt: (minute + 1) * 60000 };
+    if (tokenCount + estimatedTokens > client.tpmLimit) {
+      return { allowed: false, reason: 'tpm_limit', resetAt: minuteStart + 60000 };
     }
   }
 
   return { allowed: true };
 }
 
-function incrementRateLimit(client, actualTokens = 0) {
+function getModelUsageSnapshot(client, modelName) {
+  if (!client || !client.id || !modelName) {
+    return { rpm_used: 0, tpm_used: 0, rpd_used: 0 };
+  }
+
   const now = Date.now();
-  const minute = Math.floor(now / 60000);
-  const day = Math.floor(now / 86400000);
+  const minuteStart = Math.floor(now / 60000) * 60000;
+  const dayStart = Math.floor(now / 86400000) * 86400000;
 
-  if (!rateLimit.has(client.id)) {
-    rateLimit.set(client.id, { rpm: { timestamp: minute, count: 0 }, tpm: { timestamp: minute, count: 0 }, tpd: { timestamp: day, count: 0 } });
-  }
+  const minuteMetrics = getAggregatedMetrics({ clientId: client.id, model: modelName, from: minuteStart });
+  const dayMetrics = getAggregatedMetrics({ clientId: client.id, model: modelName, from: dayStart });
 
-  const limits = rateLimit.get(client.id);
-
-  // Increment RPM
-  if (limits.rpm.timestamp !== minute) {
-    limits.rpm = { timestamp: minute, count: 0 };
-  }
-  limits.rpm.count++;
-
-  // Increment TPM
-  if (limits.tpm.timestamp !== minute) {
-    limits.tpm = { timestamp: minute, count: 0 };
-  }
-  limits.tpm.count += actualTokens;
-
-  // Increment TPD
-  if (limits.tpd.timestamp !== day) {
-    limits.tpd = { timestamp: day, count: 0 };
-  }
-  limits.tpd.count += actualTokens;
+  return {
+    rpm_used: minuteMetrics.reduce((sum, m) => sum + Number(m.total_requests || 0), 0),
+    tpm_used: minuteMetrics.reduce((sum, m) => sum + Number(m.total_tokens || 0), 0),
+    rpd_used: dayMetrics.reduce((sum, m) => sum + Number(m.total_requests || 0), 0)
+  };
 }
 
 /* ---------- نظام المصادقة ---------- */
@@ -376,6 +356,9 @@ app.get('/register.html', (req, res) => {
   res.sendFile(fileURLToPath(new URL('./public/register.html', import.meta.url)));
 });
 app.use('/locales', express.static(fileURLToPath(new URL('./locales', import.meta.url))));
+app.get('/language.js', (_, res) => {
+  res.sendFile(fileURLToPath(new URL('./public/language.js', import.meta.url)));
+});
 
 mountModels(app, A);
 mountSmart(app, A);
@@ -457,6 +440,10 @@ app.post(A + '/clients', (req, res) => {
       daily_budget: req.body?.daily_budget,
       hourly_budget: req.body?.hourly_budget,
       tier: req.body?.tier,
+      default_model: req.body?.default_model,
+      allowed_models: req.body?.allowed_models,
+      allowed_providers: req.body?.allowed_providers,
+      routing_strategy: req.body?.routing_strategy,
       model_quotas: req.body?.model_quotas,
       allowed_hours: req.body?.allowed_hours
     }
@@ -487,16 +474,24 @@ app.delete(A + '/clients/:id', (req, res) => {
 });
 
 app.put(A + '/clients/:id', (req, res) => {
-  const { budget, rpmLimit, tpmLimit } = req.body || {};
+  const { budget, rpmLimit, tpmLimit, default_model, allowed_models, allowed_providers, routing_strategy, model_quotas, allowed_hours } = req.body || {};
   const stmt = db_sqlite.prepare(`
     UPDATE clients
-    SET budget = ?, rpm_limit = ?, tpm_limit = ?
+    SET budget = ?, rpm_limit = ?, tpm_limit = ?,
+        default_model = ?, allowed_models = ?, allowed_providers = ?, routing_strategy = ?,
+        model_quotas = ?, allowed_hours = ?
     WHERE id = ?
   `);
   stmt.run(
     budget !== undefined ? budget : null,
     rpmLimit !== undefined ? rpmLimit : 0,
     tpmLimit !== undefined ? tpmLimit : 0,
+    default_model !== undefined ? default_model : null,
+    allowed_models ? JSON.stringify(allowed_models) : null,
+    allowed_providers ? JSON.stringify(allowed_providers) : null,
+    routing_strategy || 'balanced',
+    model_quotas ? JSON.stringify(model_quotas) : null,
+    allowed_hours ? JSON.stringify(allowed_hours) : null,
     req.params.id
   );
   loadToLegacy();
@@ -545,23 +540,28 @@ app.get('/health', (_, res) => res.json({ ok: true }));
 
 app.use('/v1', (req, res, next) => {
   const t = (req.headers.authorization || '').replace(/^Bearer\s+/i, '') || req.headers['x-api-key'] || '';
-  const clients = getClients();
   const c = getClientByHash(sha(String(t)));
   if (!c) return res.status(401).json(err('invalid api key'));
 
-  // Check budget
+  const requestedModel = req.body?.model || 'auto';
+  const isAutoRequest = requestedModel === 'auto';
+  const accessCheck = isAutoRequest ? { allowed: true, model: 'auto' } : validateModelAccess(c, requestedModel);
+  if (!accessCheck.allowed) {
+    return res.status(403).json(err(`model access denied: ${accessCheck.reason}`));
+  }
+
+  req.body = { ...(req.body || {}), model: accessCheck.model };
+
   if (c.budget > 0 && c.spend >= c.budget) {
     return res.status(429).json(err('budget exceeded'));
   }
 
-  // Check advanced quotas
-  const quotaCheck = checkQuotas(c, req.body?.model);
+  const quotaCheck = checkQuotas(c, isAutoRequest ? null : accessCheck.model);
   if (!quotaCheck.allowed) {
     return res.status(429).json(err(`quota exceeded: ${quotaCheck.reason}`));
   }
 
-  // Check rate limits (without token estimation for now)
-  const rateCheck = checkRateLimit(c);
+  const rateCheck = checkRateLimit(c, estimatePromptTokens(req.body || {}));
   if (!rateCheck.allowed) {
     return res.status(429).json(err(`rate limit exceeded: ${rateCheck.reason}`));
   }
@@ -623,7 +623,9 @@ async function callProvider(name, p, path, body, signal, modelName = null) {
 async function proxy(req, res, path, needPrefix) {
   const body = req.body || {};
   const m = String(body.model || 'auto');
-  const strategy = req.headers['x-routing-strategy'] || req.query.strategy || 'balanced';
+  const strategy = req.headers['x-routing-strategy'] || req.query.strategy || normalizeModelPolicy(getClientByHash(sha(String((req.headers.authorization || '').replace(/^Bearer\s+/i, '') || req.headers['x-api-key'] || '')))||{}).routing_strategy || 'balanced';
+  const priority = String(body.priority || body.routing_priority || 'medium').toLowerCase();
+  const effectiveStrategy = priority === 'background' ? 'cheapest' : strategy;
 
   const i = m.indexOf('/');
   const named = i > 0 ? db.providers[m.slice(0, i)] : null;
@@ -632,18 +634,23 @@ async function proxy(req, res, path, needPrefix) {
   else if (needPrefix) return res.status(400).json(err('model must be "provider/model"'));
   else chain = Object.entries(db.providers).flatMap(([n, p]) => autoModels(p).map((m) => [n, p, m]));
 
-  // Apply smart routing if strategy is specified and model is 'auto'
-  if (m === 'auto' && strategy !== 'fallback') {
+  // Rank all policy-eligible models so exhausted quotas fall through to the next candidate.
+  if (m === 'auto') {
     const modelsWithProviders = chain.map(([n, p, model]) => ({ id: model, provider: n, name: p.name }));
-    const selected = selectModelForRequest(modelsWithProviders, strategy);
-    if (selected) {
-      chain = [[selected.provider, db.providers[selected.provider], selected.id]];
-    }
+    const client = getClientByHash(sha(String((req.headers.authorization || '').replace(/^Bearer\s+/i, '') || req.headers['x-api-key'] || '')));
+    const rankedModels = rankModelsForRequest(modelsWithProviders, effectiveStrategy, client, {
+      taskType: body.task_type || body.taskType || 'chat',
+      priority: body.priority || body.routing_priority || 'medium'
+    });
+    chain = rankedModels.map(({ provider, id }) => [provider, db.providers[provider], id]);
+    if (!chain.length) return res.status(429).json(err('no allowed models with quota remaining'));
   }
 
   const ac = new AbortController();
-  res.on('close', () => ac.abort());
-  let last = null, lastName = '';
+  res.on('close', () => {
+    if (!res.writableEnded) ac.abort();
+  });
+  let last = null, lastName = '', lastModel = '';
   const startTime = Date.now();
 
   for (const [n, p, model] of chain) {
@@ -656,8 +663,8 @@ async function proxy(req, res, path, needPrefix) {
       saveModels(n, p.models);
       save();
     }
-    if (r.ok) { last?.body?.cancel(); last = r; lastName = n; break; }
-    last?.body?.cancel(); last = r; lastName = n;
+    if (r.ok) { last?.body?.cancel(); last = r; lastName = n; lastModel = model; break; }
+    last?.body?.cancel(); last = r; lastName = n; lastModel = model;
   }
   if (!last) return res.status(503).json(err('all providers/keys exhausted'));
 
@@ -665,45 +672,44 @@ async function proxy(req, res, path, needPrefix) {
   res.status(last.status);
   res.setHeader('Content-Type', last.headers.get('content-type') || 'application/json');
   res.setHeader('x-proxy-provider', lastName);
-  res.setHeader('x-routing-strategy', strategy);
+  res.setHeader('x-routing-strategy', effectiveStrategy);
 
-  // Log the request after completion
-  const clients = getClients();
+  // Persist provider-reported usage after the response has been consumed.
   const client = getClientByHash(sha(String((req.headers.authorization || '').replace(/^Bearer\s+/i, '') || req.headers['x-api-key'] || '')));
   if (client) {
-    // Estimate cost (simplified - would need pricing data for accurate calculation)
-    const estimatedCost = 0.001; // Placeholder
-    updateClientSpend(client.id, estimatedCost);
-    incrementRateLimit(client, 1000); // Estimate 1000 tokens
+    const requestTokenEstimate = estimatePromptTokens(body);
+    const modelName = String(lastModel || body.model || '');
+    const modelId = modelName.startsWith(`${lastName}/`) ? modelName.slice(lastName.length + 1) : modelName;
+    const metrics = getModelMetrics(modelId, lastName) || {};
+    const usagePromise = last.clone().text().then(extractUsage).catch(() => null);
 
-    logSpend({
-      clientId: client.id,
-      provider: lastName,
-      model: body.model,
-      cost: estimatedCost,
-      tokens: 1000, // Placeholder
-      latency,
-      status: 'success'
-    });
+    void usagePromise.then((usage) => {
+      const tokens = usage?.totalTokens ?? requestTokenEstimate;
+      const cost = calculateUsageCost(usage, metrics);
+      const status = last.ok ? 'success' : 'error';
 
-    // Log to metrics table
-    logMetric({
-      clientId: client.id,
-      model: body.model,
-      providerName: lastName,
-      tokens: 1000,
-      cost: estimatedCost,
-      latencyMs: latency,
-      status: 'success'
-    });
+      if (cost !== null) {
+        updateClientSpend(client.id, cost);
+        logSpend({ clientId: client.id, provider: lastName, model: modelName, cost, tokens, latency, status });
+      }
 
-    // Update model metrics
-    incrementModelRequest(body.model, lastName, latency, true);
+      logMetric({
+        clientId: client.id,
+        model: modelName,
+        providerName: lastName,
+        tokens,
+        usageKnown: Boolean(usage),
+        cost: cost ?? 0,
+        costKnown: cost !== null,
+        latencyMs: latency,
+        status
+      });
+      incrementModelRequest(modelId, lastName, latency, last.ok);
 
-    // Alert if latency is high
-    if (latency > 2000) {
-      console.warn(`⚠️ High latency: ${latency}ms for model ${body.model} via ${lastName}`);
-    }
+      if (latency > 2000) {
+        console.warn(`⚠️ High latency: ${latency}ms for model ${modelName} via ${lastName}`);
+      }
+    }).catch((error) => console.error('Failed to persist usage metrics:', error.message));
   }
 
   Readable.fromWeb(last.body).on('error', () => res.end()).pipe(res);
@@ -711,21 +717,89 @@ async function proxy(req, res, path, needPrefix) {
 
 app.post('/v1/chat/completions', (req, res) => proxy(req, res, '/chat/completions', false));
 app.post('/v1/embeddings', (req, res) => proxy(req, res, '/embeddings', true));
-app.get('/v1/models', (_, res) => {
+app.get('/v1/models', (req, res) => {
   loadToLegacy();
+  const authHeader = req.headers.authorization || '';
+  const token = authHeader.replace(/^Bearer\s+/i, '') || req.headers['x-api-key'] || '';
+  const client = token ? getClientByHash(sha(String(token))) : null;
+
   const providers = {};
   for (const p of getProviders()) {
     providers[p.name] = p;
   }
-  res.json({
-    object: 'list',
-    data: [{ id: 'auto', object: 'model' },
-      ...Object.entries(providers).filter(([, p]) => p.keys.some((k) => !k.disabled && k.status !== 'nocredit' && k.status !== 'invalid'))
-        .flatMap(([n, p]) => (Object.keys(p.models || {}).length
-          ? Object.entries(p.models).filter(([, m]) => m.ok === true && m.enabled !== false).map(([id]) => id)
-          : p.defaultModel ? [p.defaultModel] : [])
-          .map((id) => ({ id: `${n}/${id}`, object: 'model' })))],
-  });
+
+  const policy = client ? normalizeModelPolicy(client) : { model_quotas: {} };
+
+  const data = [{
+    id: 'auto',
+    object: 'model',
+    provider: 'auto',
+    type: 'chat',
+    default: !!(client && policy.default_model),
+    quota: null,
+    rpm_limit: null,
+    rpm_remaining: null,
+    tpm_limit: null,
+    tpm_remaining: null,
+    rpd_limit: null,
+    rpd_remaining: null
+  }];
+
+  for (const [providerName, provider] of Object.entries(providers)) {
+    if (!provider.keys.some((k) => !k.disabled && k.status !== 'nocredit' && k.status !== 'invalid')) continue;
+
+    const modelIds = Object.keys(provider.models || {}).length
+      ? Object.entries(provider.models).filter(([, m]) => m.ok === true && m.enabled !== false).map(([id]) => id)
+      : provider.defaultModel ? [provider.defaultModel] : [];
+
+    for (const modelId of modelIds) {
+      const fullModelId = `${providerName}/${modelId}`;
+      if (client && !isModelAllowed(client, fullModelId)) continue;
+      const quotaKey = policy.model_quotas && (policy.model_quotas[fullModelId] || policy.model_quotas[modelId]);
+      const usage = client ? getModelUsageSnapshot(client, fullModelId) : { rpm_used: 0, tpm_used: 0, rpd_used: 0 };
+      const quotaRemaining = quotaKey
+        ? {
+            rpm_limit: Number(quotaKey.rpm || 0),
+            rpm_remaining: Math.max(0, Number(quotaKey.rpm || 0) - Number(usage.rpm_used || 0)),
+            tpm_limit: Number(quotaKey.tpm || 0),
+            tpm_remaining: Math.max(0, Number(quotaKey.tpm || 0) - Number(usage.tpm_used || 0)),
+            rpd_limit: Number(quotaKey.rpd || 0),
+            rpd_remaining: Math.max(0, Number(quotaKey.rpd || 0) - Number(usage.rpd_used || 0))
+          }
+        : {
+            rpm_limit: null,
+            rpm_remaining: null,
+            tpm_limit: null,
+            tpm_remaining: null,
+            rpd_limit: null,
+            rpd_remaining: null
+          };
+
+      const metrics = getModelMetrics(modelId, providerName) || {};
+      data.push({
+        id: fullModelId,
+        object: 'model',
+        provider: providerName,
+        type: provider.models?.[modelId]?.type || 'chat',
+        context_length: Number(metrics.context_length || 4096),
+        supports_vision: !!metrics.supports_vision,
+        supports_tools: !!metrics.supports_tools,
+        cost_per_1k_input: Number(metrics.cost_per_1k_input || 0),
+        cost_per_1k_output: Number(metrics.cost_per_1k_output || 0),
+        avg_latency_ms: Number(metrics.avg_latency_ms || 0),
+        success_rate: Number(metrics.success_rate || 1),
+        score: Number(metrics.score || 0.5),
+        default: !!(client && policy.default_model === fullModelId),
+        quota: quotaKey || null,
+        ...quotaRemaining,
+        rpm_used: usage.rpm_used,
+        tpm_used: usage.tpm_used,
+        rpd_used: usage.rpd_used
+      });
+    }
+  }
+
+  res.json({ object: 'list', data });
 });
 
 const port = process.env.PORT || 8787;

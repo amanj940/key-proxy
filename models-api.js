@@ -17,7 +17,7 @@ export function autoModels(p) {
     .map(([id]) => id);
   const d = p.defaultModel;
   const list = d && (!Object.keys(all).length || ms.includes(d)) ? [d, ...ms.filter((x) => x !== d)] : ms;
-  return list.slice(0, 3);
+  return list;
 }
 
 async function listModels(p) {

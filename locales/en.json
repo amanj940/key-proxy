@@ -1,8 +1,82 @@
 {
   "translation": {
+    "pages": {
+      "login": {
+        "title": "Sign in - Key Proxy",
+        "subtitle": "Sign in",
+        "username": "Username",
+        "usernamePlaceholder": "Enter your username",
+        "password": "Password",
+        "passwordPlaceholder": "Enter your password",
+        "submit": "Sign in",
+        "loading": "Signing in...",
+        "noAccount": "Don't have an account?",
+        "registerLink": "Create an account",
+        "missingFields": "Enter your username and password",
+        "loginSuccess": "Signed in successfully! Redirecting...",
+        "errorPrefix": "An error occurred: "
+      },
+      "register": {
+        "title": "Create account - Key Proxy",
+        "subtitle": "Create an account",
+        "username": "Username",
+        "usernamePlaceholder": "Choose a unique username",
+        "password": "Password",
+        "passwordPlaceholder": "Strong password (at least 8 characters)",
+        "passwordHint": "Password must be at least 8 characters",
+        "confirmPassword": "Confirm password",
+        "confirmPlaceholder": "Enter your password again",
+        "submit": "Create account",
+        "loading": "Creating account...",
+        "hasAccount": "Already have an account?",
+        "loginLink": "Sign in",
+        "missingFields": "Complete all fields",
+        "shortPassword": "Password must be at least 8 characters",
+        "passwordMismatch": "Passwords do not match",
+        "registerSuccess": "Account created successfully! Redirecting...",
+        "errorPrefix": "An error occurred: "
+      },
+      "home": {
+        "title": "Key Proxy - Key Management",
+        "subtitle": "Easily add your API keys",
+        "authRequired": "Sign in to add API keys",
+        "login": "Sign in",
+        "register": "Create an account",
+        "loggedIn": "Signed in",
+        "logout": "Sign out",
+        "keysPlaceholder": "Paste API keys here (one key per line)\nExample:\ngsk_...\nsk-or-...\nAIza...",
+        "addKeys": "Add keys",
+        "processing": "Processing...",
+        "adminLink": "Full admin dashboard →",
+        "missingKeys": "Enter keys first",
+        "loginRequired": "Sign in required",
+        "added": "Added {{count}} key(s) successfully",
+        "addedVerified": "(verified)",
+        "addedUnverified": "(not verified)",
+        "duplicate": "duplicate in {{provider}}",
+        "invalid": "rejected by {{provider}}",
+        "unknown": "Unknown provider",
+        "errorPrefix": "An error occurred: "
+      }
+    },
     "admin": {
       "title": "Key Proxy",
-      "subtitle": "Provider keys in one place · Auto rotation · OpenAI interface"
+      "subtitle": "Manage providers, projects and usage"
+    },
+    "dashboard": {
+      "navigation": "Dashboard sections",
+      "providers": "Providers",
+      "projects": "Projects",
+      "analytics": "Analytics",
+      "policy": "Client policy settings"
+    },
+    "auth": {
+      "required": "Sign in to manage your keys and projects.",
+      "login": "Sign in",
+      "register": "Create an account"
+    },
+    "analytics": {
+      "costUnavailable": "Not priced"
     },
     "tiles": {
       "activeKeys": "Active keys",
@@ -29,6 +103,8 @@
       "subtitle": "Give each project its own key instead of provider keys. If leaked, just delete it.",
       "placeholder": "Project name",
       "button": "Create key",
+      "optionalSettings": "Optional settings: budget, quotas and models",
+      "advancedPolicy": "Edit client policy",
       "copyNow": "Copy the key now, it will not appear again",
       "copy": "Copy",
       "toConnect": "To connect in any project:",

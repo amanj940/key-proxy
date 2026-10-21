@@ -79,6 +79,10 @@ db.exec(`
     daily_budget REAL,
     hourly_budget REAL,
     tier TEXT DEFAULT 'free',
+    default_model TEXT,
+    allowed_models TEXT,
+    allowed_providers TEXT,
+    routing_strategy TEXT DEFAULT 'balanced',
     model_quotas TEXT,
     allowed_hours TEXT
   );
@@ -121,7 +125,9 @@ db.exec(`
     model TEXT NOT NULL,
     provider_name TEXT NOT NULL,
     tokens INTEGER NOT NULL,
+    usage_known INTEGER NOT NULL DEFAULT 0,
     cost REAL NOT NULL,
+    cost_known INTEGER NOT NULL DEFAULT 0,
     latency_ms INTEGER NOT NULL,
     status TEXT NOT NULL,
     FOREIGN KEY (client_id) REFERENCES clients(id)
@@ -137,6 +143,17 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_metrics_client ON metrics(client_id);
   CREATE INDEX IF NOT EXISTS idx_metrics_timestamp ON metrics(timestamp);
 `);
+
+try {
+  db.exec('ALTER TABLE metrics ADD COLUMN cost_known INTEGER NOT NULL DEFAULT 0');
+} catch (e) {
+  if (!String(e.message).includes('duplicate column name')) throw e;
+}
+try {
+  db.exec('ALTER TABLE metrics ADD COLUMN usage_known INTEGER NOT NULL DEFAULT 0');
+} catch (e) {
+  if (!String(e.message).includes('duplicate column name')) throw e;
+}
 
 // Users table for authentication
 db.exec(`
@@ -211,6 +228,18 @@ try {
 try {
   db.exec(`ALTER TABLE clients ADD COLUMN tier TEXT DEFAULT 'free'`);
 } catch (e) { console.log('Migration: tier column exists or failed'); }
+try {
+  db.exec(`ALTER TABLE clients ADD COLUMN default_model TEXT`);
+} catch (e) { console.log('Migration: default_model column exists or failed'); }
+try {
+  db.exec(`ALTER TABLE clients ADD COLUMN allowed_models TEXT`);
+} catch (e) { console.log('Migration: allowed_models column exists or failed'); }
+try {
+  db.exec(`ALTER TABLE clients ADD COLUMN allowed_providers TEXT`);
+} catch (e) { console.log('Migration: allowed_providers column exists or failed'); }
+try {
+  db.exec(`ALTER TABLE clients ADD COLUMN routing_strategy TEXT DEFAULT 'balanced'`);
+} catch (e) { console.log('Migration: routing_strategy column exists or failed'); }
 try {
   db.exec(`ALTER TABLE clients ADD COLUMN model_quotas TEXT`);
 } catch (e) { console.log('Migration: model_quotas column exists or failed'); }
@@ -295,7 +324,17 @@ export function getModels(providerName) {
 }
 
 export function getClients() {
-  const stmt = db.prepare('SELECT id, name, prefix, created_at as created, used, last_used as last, budget, spend, rpm_limit as rpmLimit, tpm_limit as tpmLimit, monthly_budget, daily_budget, hourly_budget, tier, model_quotas, allowed_hours FROM clients');
+  const stmt = db.prepare(`
+    SELECT id, name, prefix, created_at as created, used, last_used as last,
+           budget, spend, rpm_limit as rpmLimit, tpm_limit as tpmLimit,
+           monthly_budget, daily_budget, hourly_budget, tier,
+           default_model as defaultModel,
+           allowed_models as allowedModels,
+           allowed_providers as allowedProviders,
+           routing_strategy as routingStrategy,
+           model_quotas, allowed_hours
+    FROM clients
+  `);
   return stmt.all();
 }
 
@@ -398,8 +437,13 @@ export function saveModels(providerName, models) {
 export function addClient(name, key, hash, prefix, options = {}) {
   const id = crypto.randomUUID();
   const stmt = db.prepare(`
-    INSERT INTO clients (id, name, hash, prefix, created_at, monthly_budget, daily_budget, hourly_budget, tier, model_quotas, allowed_hours)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO clients (
+      id, name, hash, prefix, created_at,
+      monthly_budget, daily_budget, hourly_budget,
+      tier, default_model, allowed_models, allowed_providers, routing_strategy,
+      model_quotas, allowed_hours
+    )
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `);
   stmt.run(
     id,
@@ -411,6 +455,10 @@ export function addClient(name, key, hash, prefix, options = {}) {
     options.daily_budget || null,
     options.hourly_budget || null,
     options.tier || 'free',
+    options.default_model || null,
+    options.allowed_models ? JSON.stringify(options.allowed_models) : null,
+    options.allowed_providers ? JSON.stringify(options.allowed_providers) : null,
+    options.routing_strategy || 'balanced',
     options.model_quotas ? JSON.stringify(options.model_quotas) : null,
     options.allowed_hours ? JSON.stringify(options.allowed_hours) : null
   );
@@ -504,7 +552,17 @@ export { db as db_sqlite, loadToLegacy };
 
 export function getClientByHash(hash) {
   // Query directly from SQLite to ensure up-to-date data
-  const stmt = db.prepare('SELECT id, name, hash, prefix, created_at as created, used, last_used as last, budget, spend, rpm_limit as rpmLimit, tpm_limit as tpmLimit, monthly_budget, daily_budget, hourly_budget, tier, model_quotas, allowed_hours FROM clients WHERE hash = ?');
+  const stmt = db.prepare(`
+    SELECT id, name, hash, prefix, created_at as created, used, last_used as last,
+           budget, spend, rpm_limit as rpmLimit, tpm_limit as tpmLimit,
+           monthly_budget, daily_budget, hourly_budget, tier,
+           default_model as defaultModel,
+           allowed_models as allowedModels,
+           allowed_providers as allowedProviders,
+           routing_strategy as routingStrategy,
+           model_quotas, allowed_hours
+    FROM clients WHERE hash = ?
+  `);
   return stmt.get(hash);
 }
 
@@ -696,8 +754,8 @@ export function getKeyHealth(providerName, keyId) {
 // Metrics logging
 export function logMetric(data) {
   const stmt = db.prepare(`
-    INSERT INTO metrics (id, timestamp, client_id, model, provider_name, tokens, cost, latency_ms, status)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO metrics (id, timestamp, client_id, model, provider_name, tokens, usage_known, cost, cost_known, latency_ms, status)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `);
   stmt.run(
     crypto.randomUUID(),
@@ -706,7 +764,9 @@ export function logMetric(data) {
     data.model,
     data.providerName,
     data.tokens,
+    data.usageKnown ? 1 : 0,
     data.cost,
+    data.costKnown ? 1 : 0,
     data.latencyMs,
     data.status
   );
@@ -750,7 +810,9 @@ export function getAggregatedMetrics(filters = {}) {
       provider_name,
       COUNT(*) as total_requests,
       SUM(tokens) as total_tokens,
-      SUM(cost) as total_cost,
+      SUM(usage_known) as usage_known_requests,
+      SUM(CASE WHEN cost_known = 1 THEN cost ELSE 0 END) as total_cost,
+      SUM(cost_known) as cost_known_requests,
       AVG(latency_ms) as avg_latency,
       SUM(CASE WHEN status = 'success' THEN 1 ELSE 0 END) as success_count,
       SUM(CASE WHEN status != 'success' THEN 1 ELSE 0 END) as error_count

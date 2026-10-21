@@ -15,7 +15,13 @@ background:radial-gradient(1100px 480px at 85% -10%,rgba(99,102,241,.2),transpar
 .logo{width:46px;height:46px;border-radius:14px;display:grid;place-items:center;font-size:23px;color:#fff;background:linear-gradient(135deg,var(--ac),var(--ac2));box-shadow:0 8px 22px -6px rgba(99,102,241,.6)}
 .top h1{margin:0;font-size:24px;letter-spacing:.2px;flex:1}
 .top h1 small{display:block;font-size:12px;font-weight:400;color:var(--mut)}
+.dashboard-tabs{display:flex;gap:6px;overflow-x:auto;border-bottom:1px solid var(--bd);margin:18px 0 12px}
+.dashboard-tab{background:transparent;color:var(--mut);box-shadow:none;border-radius:0;padding:10px 14px;border-bottom:2px solid transparent;white-space:nowrap}
+.dashboard-tab[aria-selected=true]{color:var(--ac);border-bottom-color:var(--ac)}
+.dashboard-tab:hover{transform:none}
+.dashboard-panel[hidden]{display:none}
 .tiles{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin:18px 0}
+.analytics-tiles{grid-template-columns:repeat(4,minmax(0,1fr));margin:0 0 12px}
 .tile{background:var(--card);border:1px solid var(--bd);border-radius:16px;padding:14px 16px;box-shadow:var(--sh)}
 .tile b{display:block;font-size:28px;line-height:1.1;background:linear-gradient(135deg,var(--ac),var(--ac2));-webkit-background-clip:text;background-clip:text;color:transparent}
 .tile span{color:var(--mut);font-size:13px}
@@ -84,7 +90,7 @@ code{direction:ltr;unicode-bidi:embed;word-break:break-all;font-family:ui-monosp
 [dir=rtl] .toast.ok{border-left-color:var(--ok);border-right:1px solid var(--bd)}
 [dir=rtl] .toast.bad{border-left-color:var(--bad);border-right:1px solid var(--bd)}
 @keyframes in{from{opacity:0;transform:translateY(10px)}}
-@media(max-width:560px){.tiles{grid-template-columns:1fr 1fr 1fr;gap:8px}.tile b{font-size:22px}}
+@media(max-width:560px){.tiles{grid-template-columns:1fr 1fr 1fr;gap:8px}.analytics-tiles{grid-template-columns:1fr 1fr}.tile b{font-size:22px}}
 </style>
 <div class="wrap">
   <div class="top">
@@ -96,8 +102,8 @@ code{direction:ltr;unicode-bidi:embed;word-break:break-all;font-family:ui-monosp
   </div>
   <div id="authRequired" style="text-align:center; padding:60px 20px;" hidden>
     <div style="font-size:64px; margin-bottom:20px;">🔐</div>
-    <p style="color:var(--mut); margin-bottom:30px; font-size:18px;">يجب تسجيل الدخول للوصول إلى لوحة الإدارة</p>
-    <button onclick="window.location.href='/login.html'" style="width:auto; padding:15px 40px; font-size:16px;">تسجيل الدخول</button>
+    <p id="authMessage" style="color:var(--mut); margin-bottom:30px; font-size:18px;">يجب تسجيل الدخول للوصول إلى لوحة الإدارة</p>
+    <button id="loginLink" onclick="window.location.href='/login.html'" style="width:auto; padding:15px 40px; font-size:16px;">تسجيل الدخول</button>
     <div style="margin-top:20px;">
       <a href="/register.html" style="color:var(--ac); text-decoration:none; font-size:14px;">إنشاء حساب جديد</a>
     </div>
@@ -142,7 +148,8 @@ function updateLanguage(lang) {
   // Update language toggle button
   const langToggle = document.getElementById('langToggle');
   if (langToggle) {
-    langToggle.textContent = lang === 'ar' ? '🇸🇦' : '🇺🇸';
+    langToggle.textContent = lang === 'ar' ? 'English' : 'العربية';
+    langToggle.setAttribute('aria-label', lang === 'ar' ? 'Switch language to English' : 'تغيير اللغة إلى العربية');
   }
   
   // Update title and subtitle
@@ -152,6 +159,13 @@ function updateLanguage(lang) {
     if (title.firstChild) title.firstChild.textContent = i18next.t('admin.title');
     subtitle.textContent = i18next.t('admin.subtitle');
   }
+
+  const authMessage = document.getElementById('authMessage');
+  const loginLink = document.getElementById('loginLink');
+  const registerLink = document.querySelector('#authRequired a[href="/register.html"]');
+  if (authMessage && i18next.isInitialized) authMessage.textContent = i18next.t('auth.required');
+  if (loginLink && i18next.isInitialized) loginLink.textContent = i18next.t('auth.login');
+  if (registerLink && i18next.isInitialized) registerLink.textContent = i18next.t('auth.register');
   
   // Save preference
   localStorage.setItem('keyproxy-lang', lang);
@@ -183,6 +197,7 @@ document.addEventListener('DOMContentLoaded', () => {
 const $=(s)=>document.querySelector(s);
 const h=(t,a={},...c)=>{const e=document.createElement(t);for(const[k,v]of Object.entries(a)){if(k.startsWith('on'))e.addEventListener(k.slice(2),v);else if(k==='class')e.className=v;else if(v===true)e.setAttribute(k,'');else if(v!==false&&v!=null)e.setAttribute(k,v)}e.append(...c.flat().filter(x=>x!=null&&x!==false));return e};
 let S=null,LAST=[];const OPEN=new Set(),UI={};
+let ADMIN_TAB=localStorage.getItem('keyproxy-admin-tab')||'providers';
 const ui=n=>UI[n]||(UI[n]={tab:'keys',f:'all',q:'',all:false});
 const COL={groq:'#f55036',openrouter:'#7c3aed',gemini:'#2563eb',cerebras:'#0ea5e9',mistral:'#f59e0b',sambanova:'#ea580c',nvidia:'#16a34a',xai:'#111827',fireworks:'#dc2626',huggingface:'#eab308'};
 const color=n=>COL[n]||`hsl(${[...n].reduce((a,c)=>a*31+c.charCodeAt(0),7)%360} 62% 48%)`;
@@ -224,6 +239,8 @@ async function busy(btn,txt,fn,done){
   await render();
 }
 const copy=async(txt)=>{try{await navigator.clipboard.writeText(txt);toast(window.t('projectKeys.copy'),'ok')}catch{toast(window.t('toasts.copyFailed'),'bad')}};
+const parseList=(value)=>String(value||'').split(',').map((s)=>s.trim()).filter(Boolean);
+const parseJsonField=(value, fallback)=>{try{return JSON.parse(value);}catch{return fallback;}}
 const st=(m)=>m.ok===true?'ok':m.ok===false?'bad':'unk';
 const kst=(k)=>k.status==='valid'?'ok':(k.status==='invalid'||k.status==='nocredit')?'bad':'unk';
 const ktxt=(k)=>k.status==='valid'?window.t('provider.valid'):k.status==='invalid'?window.t('provider.invalid'):k.status==='nocredit'?window.t('providers.noCredit'):'Unverified';
@@ -321,6 +338,14 @@ function provider(p){
   return d;
 }
 async function render(){
+  const hasSession=Boolean(localStorage.getItem('keyproxy_token'));
+  $('#authRequired').hidden=hasSession;
+  $('#tiles').hidden=!hasSession;
+  $('#app').hidden=!hasSession;
+  $('#scan').hidden=!hasSession;
+  $('#logoutBtn').hidden=!hasSession;
+  if(!hasSession)return;
+
   try{S=await api('GET','/state')}catch(e){toast(e.message,'bad');return}
   const app=$('#app');app.replaceChildren();
   const withKeys=S.providers.filter(p=>p.keys.length),without=S.providers.filter(p=>!p.keys.length);
@@ -339,95 +364,244 @@ async function render(){
   ta.ondragover=(e)=>{e.preventDefault();ta.classList.add('drag')};ta.ondragleave=()=>ta.classList.remove('drag');
   ta.ondrop=async(e)=>{e.preventDefault();ta.classList.remove('drag');const f=e.dataTransfer.files[0];if(f)ta.value+=(ta.value?'\n':'')+await f.text()};
   const add=h('button',{},window.t('addProviderKeys.button'));add.onclick=()=>addKeys(add,ta);
-  app.append(h('section',{class:'card'},h('h2',{},window.t('addProviderKeys.title')),
+  app.append(h('section',{class:'card','data-view':'providers'},h('h2',{},window.t('addProviderKeys.title')),
     h('p',{class:'sub'},window.t('addProviderKeys.subtitle')),
     ta,h('div',{class:'row'},add),LAST.length?h('div',{class:'chips'},...LAST.map(chip)):null));
 
   const nm=h('input',{placeholder:window.t('projectKeys.placeholder')});
-  const out=h('div',{});
+  const budgetInput=h('input',{placeholder:'Budget',type:'number',step:'0.01'});
+  const rpmInput=h('input',{placeholder:'RPM limit',type:'number',min:'0'});
+  const tpmInput=h('input',{placeholder:'TPM limit',type:'number',min:'0'});
+  const defaultModelInput=h('input',{placeholder:'Default model'});
+  const allowedModelsInput=h('input',{placeholder:'Allowed models, comma separated'});
+  const allowedProvidersInput=h('input',{placeholder:'Allowed providers, comma separated'});
+  const routingStrategyInput=h('select',{},h('option',{value:'balanced',selected:true},'balanced'),h('option',{value:'fastest'},'fastest'),h('option',{value:'cheapest'},'cheapest'),h('option',{value:'best_quality'},'best_quality'));
+  const modelQuotasInput=h('textarea',{placeholder:'{"model/name":{"rpm":10,"tpm":1000,"rpd":20}}',style:'min-height:80px'});
+  const allowedHoursInput=h('input',{placeholder:'Allowed hours as JSON array, e.g. [0,1,2,3]'});
   const mk=h('button',{},window.t('projectKeys.button'));
   mk.onclick=async()=>{
     if(!nm.value.trim())return;
-    const r=await api('POST','/clients',{name:nm.value});
+    const payload={
+      name:nm.value,
+      budget: budgetInput.value !== '' ? Number(budgetInput.value) : undefined,
+      rpmLimit: rpmInput.value !== '' ? Number(rpmInput.value) : undefined,
+      tpmLimit: tpmInput.value !== '' ? Number(tpmInput.value) : undefined,
+      default_model: defaultModelInput.value || undefined,
+      allowed_models: parseList(allowedModelsInput.value),
+      allowed_providers: parseList(allowedProvidersInput.value),
+      routing_strategy: routingStrategyInput.value || 'balanced',
+      model_quotas: parseJsonField(modelQuotasInput.value, {}),
+      allowed_hours: parseJsonField(allowedHoursInput.value, [])
+    };
+    const r=await api('POST','/clients',payload);
+    ADMIN_TAB='projects';
+    localStorage.setItem('keyproxy-admin-tab',ADMIN_TAB);
     await render();
     $('#newkey').replaceChildren(h('div',{class:'newkey'},h('b',{},window.t('projectKeys.copyNow')),h('code',{},r.key),h('button',{class:'sm',onclick:()=>copy(r.key)},window.t('projectKeys.copy'))))
   };
-  app.append(h('section',{class:'card'},h('h2',{},window.t('projectKeys.title')),
+  app.append(h('section',{class:'card','data-view':'projects'},h('h2',{},window.t('projectKeys.title')),
     h('p',{class:'sub'},window.t('projectKeys.subtitle')),
-    h('div',{class:'row'},nm,mk),h('div',{id:'newkey'}),
+    h('div',{class:'row'},nm,mk),
+    h('details',{},h('summary',{},window.t('projectKeys.optionalSettings')),
+      h('div',{class:'row'},budgetInput,rpmInput,tpmInput),
+      h('div',{class:'row'},defaultModelInput,routingStrategyInput),
+      h('div',{class:'row'},allowedModelsInput,allowedProvidersInput),
+      h('div',{class:'row'},h('div',{style:'flex:1'},modelQuotasInput),h('div',{style:'flex:1'},allowedHoursInput))),
+    h('div',{id:'newkey'}),
     S.clients.length?h('table',{},h('tr',{},...[window.t('projectKeys.name'),window.t('projectKeys.key'),window.t('projectKeys.requests'),''].map(x=>h('th',{},x))),
       ...S.clients.map(c=>{const b=h('button',{class:'bad sm'},window.t('projectKeys.delete'));b.onclick=()=>{if(confirm(window.t('projectKeys.deleteConfirm')))busy(b,'…',()=>api('DELETE','/clients/'+c.id))};
         return h('tr',{},h('td',{},c.name),h('td',{},h('code',{},c.prefix)),h('td',{},String(c.used||0)),h('td',{},b));})):null,
     h('div',{class:'row mut',style:'font-size:13px'},window.t('projectKeys.toConnect'),h('code',{},'OPENAI_BASE_URL=http://127.0.0.1:8787/v1'),
       h('button',{class:'ghost sm',onclick:()=>copy('OPENAI_BASE_URL=http://127.0.0.1:8787/v1')},window.t('projectKeys.copy')))));
 
-  app.append(h('section',{class:'card'},h('h2',{},window.t('providers.title')),h('p',{class:'sub'},window.t('providers.subtitle')),
+  const policySelect = h('select',{});
+  const policyClientMap = new Map(S.clients.map((client) => [client.id, client]));
+  const policyDefaultModel = h('input',{placeholder:'Default model'});
+  const policyAllowedModels = h('input',{placeholder:'Allowed models'});
+  const policyAllowedProviders = h('input',{placeholder:'Allowed providers'});
+  const policyStrategy = h('select',{},h('option',{value:'balanced',selected:true},'balanced'),h('option',{value:'fastest'},'fastest'),h('option',{value:'cheapest'},'cheapest'),h('option',{value:'best_quality'},'best_quality'));
+  const policyBudget = h('input',{placeholder:'Budget',type:'number',step:'0.01'});
+  const policyRpm = h('input',{placeholder:'RPM limit',type:'number',min:'0'});
+  const policyTpm = h('input',{placeholder:'TPM limit',type:'number',min:'0'});
+  const policyQuotas = h('textarea',{placeholder:'{"model/name":{"rpm":10,"tpm":1000,"rpd":20}}',style:'min-height:80px'});
+  const policyHours = h('input',{placeholder:'Allowed hours JSON array'});
+  const policySave = h('button',{},'Save policy');
+  const loadSelectedClient = () => {
+    const selected = policyClientMap.get(policySelect.value) || S.clients[0];
+    if (!selected) return;
+    policyDefaultModel.value = selected.defaultModel || '';
+    policyAllowedModels.value = Array.isArray(selected.allowedModels) ? selected.allowedModels.join(', ') : (selected.allowedModels || '');
+    policyAllowedProviders.value = Array.isArray(selected.allowedProviders) ? selected.allowedProviders.join(', ') : (selected.allowedProviders || '');
+    policyStrategy.value = selected.routingStrategy || 'balanced';
+    policyBudget.value = selected.budget ?? '';
+    policyRpm.value = selected.rpmLimit ?? '';
+    policyTpm.value = selected.tpmLimit ?? '';
+    policyQuotas.value = selected.model_quotas ? JSON.stringify(selected.model_quotas, null, 2) : '';
+    try { policyHours.value = selected.allowed_hours ? JSON.stringify(JSON.parse(selected.allowed_hours)) : ''; } catch { policyHours.value = ''; }
+  };
+  policySelect.replaceChildren(...(S.clients.length ? S.clients.map((c)=>h('option',{value:c.id},c.name)) : [h('option',{value:''},'No clients')]));
+  policySelect.onchange = () => loadSelectedClient();
+  policySave.onclick = async () => {
+    const selected = policyClientMap.get(policySelect.value) || S.clients[0];
+    if (!selected) return;
+    const payload = {
+      budget: policyBudget.value !== '' ? Number(policyBudget.value) : null,
+      rpmLimit: policyRpm.value !== '' ? Number(policyRpm.value) : 0,
+      tpmLimit: policyTpm.value !== '' ? Number(policyTpm.value) : 0,
+      default_model: policyDefaultModel.value || null,
+      allowed_models: parseList(policyAllowedModels.value),
+      allowed_providers: parseList(policyAllowedProviders.value),
+      routing_strategy: policyStrategy.value || 'balanced',
+      model_quotas: parseJsonField(policyQuotas.value, {}),
+      allowed_hours: parseJsonField(policyHours.value, [])
+    };
+    await api('PUT',`/clients/${selected.id}`, payload);
+    toast('Client policy saved', 'ok');
+    await render();
+  };
+  if(S.clients.length)app.append(h('details',{class:'card','data-view':'projects'},h('summary',{},h('b',{},window.t('dashboard.policy'))),h('p',{class:'sub'},'Set default model, allowed models, provider restrictions, quotas and routing'),
+    h('div',{class:'row'},policySelect),
+    h('details',{},h('summary',{},window.t('projectKeys.advancedPolicy')),
+      h('div',{class:'row'},policyDefaultModel,policyStrategy),
+      h('div',{class:'row'},policyBudget,policyRpm,policyTpm),
+      h('div',{class:'row'},policyAllowedModels,policyAllowedProviders),
+      h('div',{class:'row'},h('div',{style:'flex:1'},policyQuotas),h('div',{style:'flex:1'},policyHours)),
+      h('div',{class:'row'},policySave))));
+  if (S.clients.length) loadSelectedClient();
+
+  app.append(h('section',{class:'card','data-view':'providers'},h('h2',{},window.t('providers.title')),h('p',{class:'sub'},window.t('providers.subtitle')),
     ...(withKeys.length?withKeys.map(provider):[h('p',{class:'mut'},window.t('providers.noKeys'))]),
     without.length?h('details',{style:'margin-top:12px'},h('summary',{class:'mut'},window.t('providers.withoutKeys')+' ('+String(without.length)+')'),
       h('div',{class:'row'},...without.map(p=>h('span',{class:'pill'},p.name)))):null));
 
   // Analytics Section
-  app.append(h('section',{class:'card'},h('h2',{},'Analytics'),h('p',{class:'sub'},'Usage metrics and performance data'),
+  const analyticsRefresh = h('button',{class:'ghost sm'},'↻ Refresh');
+  analyticsRefresh.onclick = () => window.refreshLiveMetrics?.();
+  app.append(h('section',{class:'card','data-view':'analytics'},h('h2',{},'Live Analytics'),h('p',{class:'sub'},'Live usage and performance overview'),
+    h('div',{class:'row'},analyticsRefresh,h('span',{id:'analytics-updated',class:'mut','aria-live':'polite'},'Waiting for first update')),
     h('div',{id:'analytics-loading'},'Loading analytics...'),
     h('div',{id:'analytics-content',hidden:true},
-      h('div',{class:'row'},h('b',{},'Total Requests: '),h('span',{},String(S.metrics?.total_requests||0))),
-      h('div',{class:'row'},h('b',{},'Total Cost: '),h('span',{},'$'+(S.metrics?.total_cost||0).toFixed(2))),
-      h('div',{class:'row'},h('b',{},'Avg Latency: '),h('span',{},String(Math.round(S.metrics?.avg_latency||0))+'ms')),
-      h('div',{class:'row'},h('b',{},'Success Rate: '),h('span',{},String(Math.round((S.metrics?.success_rate||0)*100))+'%')),
-      h('div',{style:'margin-top:20px'}),
+      h('div',{class:'tiles analytics-tiles'},
+        h('div',{class:'tile'},h('b',{id:'metric-total-requests'},'0'),h('span',{},'Requests')),
+        h('div',{class:'tile'},h('b',{id:'metric-total-cost'},'—'),h('span',{},'Cost')),
+        h('div',{class:'tile'},h('b',{id:'metric-avg-latency'},'0ms'),h('span',{},'Latency')),
+        h('div',{class:'tile'},h('b',{id:'metric-success-rate'},'0%'),h('span',{},'Success'))
+      ),
       h('canvas',{id:'usageChart',style:'max-height:300px'}),
-      h('div',{style:'margin-top:20px'}),
-      h('h3',{},'Top Models by Usage'),
-      h('ul',{},...(S.metrics?.top_models||[]).map(m=>h('li',{},h('code',{},m.model),' - '+String(m.total_requests||0)+' requests'))),
-      h('div',{style:'margin-top:20px'}),
-      h('h3',{},'Top Providers by Usage'),
-      h('ul',{},...(S.metrics?.top_providers||[]).map(p=>h('li',{},h('code',{},p.provider_name),' - '+String(p.total_requests||0)+' requests')))
+      h('div',{style:'margin-top:20px'},
+        h('h3',{},'Top Models by Usage'),
+        h('ul',{id:'top-models-list'}),
+        h('h3',{},'Top Providers by Usage'),
+        h('ul',{id:'top-providers-list'})
+      )
     )
   ));
 
-  // Load analytics data
-  (async()=>{
-    try{
-      const metrics=await api('GET','/metrics');
-      const total=metrics.metrics.reduce((a,m)=>a+m.total_requests,0);
-      const cost=metrics.metrics.reduce((a,m)=>a+m.total_cost,0);
-      const avgLat=metrics.metrics.length>0 ? metrics.metrics.reduce((a,m)=>a+m.avg_latency,0)/metrics.metrics.length : 0;
-      const successRate=total>0 ? metrics.metrics.reduce((a,m)=>a+m.success_count,0)/total : 0;
-      const topModels=[...metrics.metrics].sort((a,b)=>b.total_requests-a.total_requests).slice(0,5);
-      const topProviders=[...metrics.metrics].sort((a,b)=>b.total_requests-a.total_requests).slice(0,5);
+  window.refreshLiveMetrics = async function () {
+    const loading = document.getElementById('analytics-loading');
+    const content = document.getElementById('analytics-content');
+    if (!loading || !content || window.__liveMetricsLoading) return;
+    window.__liveMetricsLoading = true;
+    analyticsRefresh.disabled = true;
+    try {
+      const metrics = await api('GET', '/metrics');
+      const rows = Array.isArray(metrics?.metrics) ? metrics.metrics : [];
+      const totalRequests = rows.reduce((sum, item) => sum + Number(item.total_requests || 0), 0);
+      const totalCost = rows.reduce((sum, item) => sum + Number(item.total_cost || 0), 0);
+      const pricedRequests = rows.reduce((sum, item) => sum + Number(item.cost_known_requests || 0), 0);
+      const avgLatency = totalRequests ? rows.reduce((sum, item) => sum + Number(item.avg_latency || 0) * Number(item.total_requests || 0), 0) / totalRequests : 0;
+      const successRate = totalRequests ? rows.reduce((sum, item) => sum + Number(item.success_count || 0), 0) / totalRequests : 0;
+      const modelTotals = new Map();
+      const providerTotals = new Map();
+      for (const item of rows) {
+        const modelName = [item.provider_name, item.model].filter(Boolean).join('/') || 'unknown';
+        const modelTotal = modelTotals.get(modelName) || { model: modelName, total_requests: 0 };
+        modelTotal.total_requests += Number(item.total_requests || 0);
+        modelTotals.set(modelName, modelTotal);
 
-      S.metrics={total_requests:total,total_cost:cost,avg_latency:avgLat,success_rate:successRate,top_models:topModels,top_providers:topProviders};
-      $('#analytics-loading').hidden=true;
-      $('#analytics-content').hidden=false;
+        const providerName = item.provider_name || 'unknown';
+        const providerTotal = providerTotals.get(providerName) || { provider_name: providerName, total_requests: 0 };
+        providerTotal.total_requests += Number(item.total_requests || 0);
+        providerTotals.set(providerName, providerTotal);
+      }
+      const topModels = [...modelTotals.values()].sort((a, b) => b.total_requests - a.total_requests).slice(0, 5);
+      const topProviders = [...providerTotals.values()].sort((a, b) => b.total_requests - a.total_requests).slice(0, 5);
 
-      // Create chart
-      const ctx=$('#usageChart').getContext('2d');
-      new Chart(ctx,{
-        type:'bar',
-        data:{
-          labels:topModels.map(m=>m.model),
-          datasets:[{
-            label:'Requests',
-            data:topModels.map(m=>m.total_requests),
-            backgroundColor:'rgba(99,102,241,0.6)',
-            borderColor:'rgba(99,102,241,1)',
-            borderWidth:1
-          }]
-        },
-        options:{
-          responsive:true,
-          plugins:{legend:{display:false}},
-          scales:{y:{beginAtZero:true}}
-        }
-      });
-    }catch(e){
-      $('#analytics-loading').textContent='Failed to load analytics: '+e.message;
+      document.getElementById('metric-total-requests').textContent = String(totalRequests);
+      document.getElementById('metric-total-cost').textContent = pricedRequests ? '$' + totalCost.toFixed(2) : window.t('analytics.costUnavailable');
+      document.getElementById('metric-avg-latency').textContent = Math.round(avgLatency) + 'ms';
+      document.getElementById('metric-success-rate').textContent = Math.round(successRate * 100) + '%';
+
+      const modelList = document.getElementById('top-models-list');
+      modelList.replaceChildren(...(topModels.length ? topModels.map((item) => h('li', {}, h('code', {}, item.model || 'unknown'), ' - ' + String(item.total_requests || 0) + ' requests')) : [h('li', {}, 'No model usage yet')]));
+
+      const providerList = document.getElementById('top-providers-list');
+      providerList.replaceChildren(...(topProviders.length ? topProviders.map((item) => h('li', {}, h('code', {}, item.provider_name || 'unknown'), ' - ' + String(item.total_requests || 0) + ' requests')) : [h('li', {}, 'No provider usage yet')]));
+
+      const ctx = document.getElementById('usageChart');
+      if (ctx) {
+        if (window.liveMetricsChart) window.liveMetricsChart.destroy();
+        window.liveMetricsChart = new Chart(ctx.getContext('2d'), {
+          type: 'bar',
+          data: {
+            labels: topModels.map((item) => item.model || 'unknown'),
+            datasets: [{
+              label: 'Requests',
+              data: topModels.map((item) => Number(item.total_requests || 0)),
+              backgroundColor: 'rgba(99, 102, 241, 0.6)',
+              borderColor: 'rgba(99, 102, 241, 1)',
+              borderWidth: 1
+            }]
+          },
+          options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } }
+        });
+      }
+
+      loading.hidden = true;
+      content.hidden = false;
+      document.getElementById('analytics-updated').textContent = 'Updated ' + new Date().toLocaleTimeString(document.documentElement.lang);
+      S.metrics = { total_requests: totalRequests, total_cost: totalCost, avg_latency: avgLatency, success_rate: successRate, top_models: topModels, top_providers: topProviders };
+    } catch (err) {
+      if (content.hidden) loading.textContent = 'Failed to load analytics: ' + err.message;
+      else document.getElementById('analytics-updated').textContent = 'Refresh failed: ' + err.message;
+    } finally {
+      window.__liveMetricsLoading = false;
+      analyticsRefresh.disabled = false;
     }
-  })();
+  };
+
+  window.refreshLiveMetrics();
+  if (!window.__liveMetricsTimer) {
+    window.__liveMetricsTimer = setInterval(() => window.refreshLiveMetrics && window.refreshLiveMetrics(), 15000);
+  }
 
   const cn=h('input',{placeholder:window.t('advanced.name')}),cu=h('input',{placeholder:window.t('advanced.baseUrl')}),cm=h('input',{placeholder:window.t('advanced.defaultModel')});
   const ab=h('button',{},window.t('advanced.add'));ab.onclick=()=>busy(ab,'…',()=>api('PUT','/providers/'+cn.value.trim().toLowerCase(),{baseUrl:cu.value,defaultModel:cm.value}));
-  app.append(h('details',{class:'card'},h('summary',{},window.t('advanced.title')),h('div',{class:'row'},cn,cu,cm,ab)));
+  app.append(h('details',{class:'card','data-view':'providers'},h('summary',{},window.t('advanced.title')),h('div',{class:'row'},cn,cu,cm,ab)));
+
+  const views={
+    providers:[...app.querySelectorAll('[data-view="providers"]')],
+    projects:[...app.querySelectorAll('[data-view="projects"]')],
+    analytics:[...app.querySelectorAll('[data-view="analytics"]')]
+  };
+  const tabs=h('nav',{class:'dashboard-tabs','aria-label':window.t('dashboard.navigation'),'role':'tablist'});
+  const panels=h('div',{});
+  const viewLabels={providers:window.t('dashboard.providers'),projects:window.t('dashboard.projects'),analytics:window.t('dashboard.analytics')};
+  for(const [view,content] of Object.entries(views)){
+    const active=ADMIN_TAB===view;
+    const panel=h('section',{class:'dashboard-panel',id:'dashboard-'+view,'role':'tabpanel','aria-labelledby':'tab-'+view,hidden:!active});
+    panel.append(...content);
+    const tab=h('button',{class:'dashboard-tab','id':'tab-'+view,'type':'button','role':'tab','aria-controls':panel.id,'aria-selected':String(active)},viewLabels[view]);
+    tab.onclick=()=>{
+      ADMIN_TAB=view;
+      localStorage.setItem('keyproxy-admin-tab',view);
+      for(const item of tabs.children)item.setAttribute('aria-selected',String(item.id==='tab-'+view));
+      for(const item of panels.children)item.hidden=item.id!=='dashboard-'+view;
+    };
+    tabs.append(tab);
+    panels.append(panel);
+  }
+  app.replaceChildren(tabs,panels);
 }
 
 // Initialize i18n and render
@@ -439,12 +613,15 @@ initI18n().then(() => {
   const jwtToken = localStorage.getItem('keyproxy_token');
   
   if (jwtToken) {
-    document.getElementById('authRequired').hidden = true;
-    document.getElementById('logoutBtn').hidden = false;
     render();
   } else {
     document.getElementById('authRequired').hidden = false;
     document.getElementById('logoutBtn').hidden = true;
+    document.getElementById('tiles').hidden = true;
+    document.getElementById('app').hidden = true;
+    document.getElementById('scan').hidden = true;
+    document.getElementById('authMessage').textContent = window.t('auth.required');
+    document.getElementById('loginLink').textContent = window.t('auth.login');
     // Don't render admin panel if not authenticated
   }
 });

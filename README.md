@@ -34,6 +34,12 @@ A smart AI gateway for managing multiple LLM provider keys in one place with Ope
 - Usage and performance tracking
 - Integrated admin interface
 
+## Documentation
+
+- [Project overview and architecture](docs/PROJECT_DOCUMENTATION.md)
+- [Implemented updates, verification, deployment, and known limitations](docs/IMPLEMENTED_UPDATES.md)
+- [Planned upgrades](docs/REQUIRED_UPGRADES.md)
+
 ## Installation
 
 ### Requirements

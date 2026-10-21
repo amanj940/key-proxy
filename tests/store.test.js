@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { enc, dec, sha } from '../store.js';
+import { enc, dec, sha, addClient, db_sqlite, getAggregatedMetrics, logMetric } from '../store.js';
 import fs from 'node:fs';
 import crypto from 'node:crypto';
 
@@ -75,5 +75,53 @@ describe('Store Security Functions', () => {
       const hash = sha('any string');
       expect(hash).toHaveLength(64);
     });
+  });
+});
+
+describe('Persistent usage metrics', () => {
+  let clientId;
+
+  beforeEach(() => {
+    const key = crypto.randomUUID();
+    clientId = addClient('usage-test', key, sha(key), key.slice(0, 10)).id;
+  });
+
+  afterEach(() => {
+    db_sqlite.prepare('DELETE FROM metrics WHERE client_id = ?').run(clientId);
+    db_sqlite.prepare('DELETE FROM spend_logs WHERE client_id = ?').run(clientId);
+    db_sqlite.prepare('DELETE FROM clients WHERE id = ?').run(clientId);
+  });
+
+  it('aggregates durable token usage while excluding unpriced requests from cost totals', () => {
+    const now = Date.now();
+    logMetric({
+      clientId,
+      model: 'provider/model-a',
+      providerName: 'provider',
+      tokens: 40,
+      usageKnown: true,
+      cost: 0.25,
+      costKnown: true,
+      latencyMs: 120,
+      status: 'success'
+    });
+    logMetric({
+      clientId,
+      model: 'provider/model-a',
+      providerName: 'provider',
+      tokens: 12,
+      usageKnown: false,
+      cost: 0,
+      costKnown: false,
+      latencyMs: 150,
+      status: 'success'
+    });
+
+    const [metrics] = getAggregatedMetrics({ clientId, from: now - 1000 });
+    expect(metrics.total_requests).toBe(2);
+    expect(metrics.total_tokens).toBe(52);
+    expect(metrics.usage_known_requests).toBe(1);
+    expect(metrics.total_cost).toBeCloseTo(0.25);
+    expect(metrics.cost_known_requests).toBe(1);
   });
 });

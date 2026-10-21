@@ -1,8 +1,82 @@
 {
   "translation": {
+    "pages": {
+      "login": {
+        "title": "تسجيل الدخول - Key Proxy",
+        "subtitle": "تسجيل الدخول",
+        "username": "اسم المستخدم",
+        "usernamePlaceholder": "أدخل اسم المستخدم",
+        "password": "كلمة المرور",
+        "passwordPlaceholder": "أدخل كلمة المرور",
+        "submit": "تسجيل الدخول",
+        "loading": "جاري تسجيل الدخول...",
+        "noAccount": "ليس لديك حساب؟",
+        "registerLink": "إنشاء حساب جديد",
+        "missingFields": "الرجاء إدخال اسم المستخدم وكلمة المرور",
+        "loginSuccess": "تم تسجيل الدخول بنجاح! جاري التحويل...",
+        "errorPrefix": "حدث خطأ: "
+      },
+      "register": {
+        "title": "إنشاء حساب - Key Proxy",
+        "subtitle": "إنشاء حساب جديد",
+        "username": "اسم المستخدم",
+        "usernamePlaceholder": "اختر اسم مستخدم فريد",
+        "password": "كلمة المرور",
+        "passwordPlaceholder": "كلمة مرور قوية (8 أحرف على الأقل)",
+        "passwordHint": "كلمة المرور يجب أن تكون 8 أحرف على الأقل",
+        "confirmPassword": "تأكيد كلمة المرور",
+        "confirmPlaceholder": "أعد إدخال كلمة المرور",
+        "submit": "إنشاء الحساب",
+        "loading": "جاري إنشاء الحساب...",
+        "hasAccount": "لديك حساب بالفعل؟",
+        "loginLink": "تسجيل الدخول",
+        "missingFields": "الرجاء ملء جميع الحقول",
+        "shortPassword": "كلمة المرور يجب أن تكون 8 أحرف على الأقل",
+        "passwordMismatch": "كلمات المرور غير متطابقة",
+        "registerSuccess": "تم إنشاء الحساب بنجاح! جاري التحويل...",
+        "errorPrefix": "حدث خطأ: "
+      },
+      "home": {
+        "title": "Key Proxy - لوحة إضافة المفاتيح",
+        "subtitle": "أضف مفاتيح API الخاصة بك بسهولة",
+        "authRequired": "يجب تسجيل الدخول لإضافة مفاتيح API",
+        "login": "تسجيل الدخول",
+        "register": "إنشاء حساب جديد",
+        "loggedIn": "مسجل دخول",
+        "logout": "تسجيل الخروج",
+        "keysPlaceholder": "الصق مفاتيح API هنا (مفتاح لكل سطر)\nمثال:\ngsk_...\nsk-or-...\nAIza...",
+        "addKeys": "إضافة المفاتيح",
+        "processing": "جاري المعالجة...",
+        "adminLink": "لوحة الإدارة الكاملة →",
+        "missingKeys": "الرجاء إدخال مفاتيح أولاً",
+        "loginRequired": "مطلوب تسجيل الدخول",
+        "added": "تم إضافة {{count}} مفتاح بنجاح",
+        "addedVerified": "(مُحقق)",
+        "addedUnverified": "(غير مُحقق)",
+        "duplicate": "مكرر في {{provider}}",
+        "invalid": "غير صالح لدى {{provider}}",
+        "unknown": "مزود غير معروف",
+        "errorPrefix": "حدث خطأ: "
+      }
+    },
     "admin": {
       "title": "Key Proxy",
-      "subtitle": "مفاتيح المزودين في مكان واحد · تدوير تلقائي · واجهة OpenAI"
+      "subtitle": "إدارة المزودين والمشاريع والاستخدام"
+    },
+    "dashboard": {
+      "navigation": "أقسام لوحة الإدارة",
+      "providers": "المزودون",
+      "projects": "المشاريع",
+      "analytics": "التحليلات",
+      "policy": "إدارة سياسة العميل"
+    },
+    "auth": {
+      "required": "سجّل الدخول لإدارة مفاتيحك ومشاريعك.",
+      "login": "تسجيل الدخول",
+      "register": "إنشاء حساب جديد"
+    },
+    "analytics": {
+      "costUnavailable": "لا توجد أسعار"
     },
     "tiles": {
       "activeKeys": "مفتاح مفعّل",
@@ -29,6 +103,8 @@
       "subtitle": "أعطِ كل مشروع مفتاحاً مستقلاً بدل مفاتيح المزودين. إن انكشف احذفه فقط.",
       "placeholder": "اسم المشروع",
       "button": "إنشاء مفتاح",
+      "optionalSettings": "إعدادات اختيارية: الميزانية والحصص والنماذج",
+      "advancedPolicy": "تعديل سياسة العميل",
       "copyNow": "انسخ المفتاح الآن، لن يظهر مرة ثانية",
       "copy": "نسخ",
       "toConnect": "للربط في أي مشروع:",

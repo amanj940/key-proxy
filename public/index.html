@@ -163,39 +163,51 @@
     .admin-link a:hover {
       text-decoration: underline;
     }
+    .language-toggle {
+      position: fixed;
+      top: 18px;
+      inset-inline-end: 18px;
+      margin: 0;
+      padding: 8px 14px;
+      background: var(--card);
+      color: var(--fg);
+      border: 1px solid var(--bd);
+      box-shadow: none;
+    }
   </style>
 </head>
-<body>
+<body data-title-key="home.title">
+  <button id="languageToggle" class="language-toggle" type="button">English</button>
   <div class="wrap">
     <div class="card">
       <h1>🔑 Key Proxy</h1>
-      <p class="subtitle">أضف مفاتيح API الخاصة بك بسهولة</p>
+      <p class="subtitle" data-i18n="home.subtitle">أضف مفاتيح API الخاصة بك بسهولة</p>
       
       <div id="authRequired" style="text-align:center; padding:40px 20px;">
         <div style="font-size:48px; margin-bottom:20px;">🔐</div>
-        <p style="color:var(--mut); margin-bottom:20px;">يجب تسجيل الدخول لإضافة مفاتيح API</p>
-        <button onclick="window.location.href='/login.html'" style="width:auto; padding:12px 30px;">تسجيل الدخول</button>
+        <p style="color:var(--mut); margin-bottom:20px;" data-i18n="home.authRequired">يجب تسجيل الدخول لإضافة مفاتيح API</p>
+        <button onclick="window.location.href='/login.html'" style="width:auto; padding:12px 30px;" data-i18n="home.login">تسجيل الدخول</button>
         <div style="margin-top:15px;">
-          <a href="/register.html" style="color:var(--ac); text-decoration:none;">إنشاء حساب جديد</a>
+          <a href="/register.html" style="color:var(--ac); text-decoration:none;" data-i18n="home.register">إنشاء حساب جديد</a>
         </div>
       </div>
       
       <div id="authContent" hidden>
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
-          <span style="color:var(--mut); font-size:14px;">مسجل دخول</span>
-          <button onclick="logout()" style="padding:6px 12px; font-size:13px; margin:0; background:var(--card2); color:var(--fg); border:1px solid var(--bd);">تسجيل الخروج</button>
+          <span style="color:var(--mut); font-size:14px;" data-i18n="home.loggedIn">مسجل دخول</span>
+          <button onclick="logout()" style="padding:6px 12px; font-size:13px; margin:0; background:var(--card2); color:var(--fg); border:1px solid var(--bd);" data-i18n="home.logout">تسجيل الخروج</button>
         </div>
         
-        <textarea id="keysInput" placeholder="الصق مفاتيح API هنا (مفتاح لكل سطر)&#10;مثال:&#10;gsk_...&#10;sk-or-...&#10;AIza..."></textarea>
+        <textarea id="keysInput" data-i18n-placeholder="home.keysPlaceholder" placeholder="الصق مفاتيح API هنا (مفتاح لكل سطر)"></textarea>
         
-        <button id="addKeysBtn" onclick="addKeys()">إضافة المفاتيح</button>
+        <button id="addKeysBtn" onclick="addKeys()" data-i18n="home.addKeys">إضافة المفاتيح</button>
         
         <div id="results" class="results"></div>
       </div>
     </div>
     
     <div class="admin-link">
-      <a href="/admin">لوحة الإدارة الكاملة →</a>
+      <a href="/admin" data-i18n="home.adminLink">لوحة الإدارة الكاملة →</a>
     </div>
   </div>
   
@@ -217,18 +229,18 @@
       const TOKEN = getAuthToken();
       
       if (!textarea.value.trim()) {
-        toast('الرجاء إدخال مفاتيح أولاً', 'bad');
+        toast(window.pageT('home.missingKeys'), 'bad');
         return;
       }
       
       if (!TOKEN) {
-        toast('مطلوب تسجيل الدخول', 'bad');
+        toast(window.pageT('home.loginRequired'), 'bad');
         window.location.href = '/login.html';
         return;
       }
       
       btn.disabled = true;
-      btn.textContent = 'جاري المعالجة...';
+      btn.textContent = window.pageT('home.processing');
       
       try {
         const headers = { 'Content-Type': 'application/json' };
@@ -265,10 +277,10 @@
             }[r.status];
             
             const text = {
-              added: `${r.provider} · …${r.tail} ${r.verified ? '(مُحقق)' : '(غير مُحقق)'}`,
-              duplicate: `…${r.tail} مكرر في ${r.provider}`,
-              invalid: `…${r.tail} غير صالح ${r.provider}`,
-              unknown: `…${r.tail} غير معروف`
+              added: `${r.provider} · …${r.tail} ${window.pageT(r.verified ? 'home.addedVerified' : 'home.addedUnverified')}`,
+              duplicate: `…${r.tail} ${window.pageT('home.duplicate', { provider: r.provider })}`,
+              invalid: `…${r.tail} ${window.pageT('home.invalid', { provider: r.provider })}`,
+              unknown: `…${r.tail} ${window.pageT('home.unknown')}`
             }[r.status];
             
             chip.innerHTML = `<span>${icon}</span><span>${text}</span>`;
@@ -276,14 +288,14 @@
           });
           
           const added = data.results.filter(r => r.status === 'added').length;
-          toast(`تم إضافة ${added} مفتاح بنجاح`, 'ok');
+          toast(window.pageT('home.added', { count: added }), 'ok');
         }
       } catch (error) {
-        toast('حدث خطأ: ' + error.message, 'bad');
+        toast(window.pageT('home.errorPrefix') + error.message, 'bad');
       }
       
       btn.disabled = false;
-      btn.textContent = 'إضافة المفاتيح';
+      btn.textContent = window.pageT('home.addKeys');
     }
     
     function toast(msg, kind = '') {
@@ -332,5 +344,6 @@
       };
     }
   </script>
+  <script src="/language.js"></script>
 </body>
 </html>
