@@ -35,6 +35,12 @@ db.exec(`
     disabled INTEGER DEFAULT 0,
     used INTEGER DEFAULT 0,
     errors INTEGER DEFAULT 0,
+    success_rate REAL DEFAULT 1.0,
+    last_error TEXT,
+    cooldown_until INTEGER DEFAULT 0,
+    allowed_models TEXT,
+    rpm_limit INTEGER DEFAULT 0,
+    tpm_limit INTEGER DEFAULT 0,
     FOREIGN KEY (provider_name) REFERENCES providers(name) ON DELETE CASCADE
   );
 
@@ -61,7 +67,13 @@ db.exec(`
     budget REAL,
     spend REAL DEFAULT 0,
     rpm_limit INTEGER DEFAULT 0,
-    tpm_limit INTEGER DEFAULT 0
+    tpm_limit INTEGER DEFAULT 0,
+    monthly_budget REAL,
+    daily_budget REAL,
+    hourly_budget REAL,
+    tier TEXT DEFAULT 'free',
+    model_quotas TEXT,
+    allowed_hours TEXT
   );
 
   CREATE TABLE IF NOT EXISTS spend_logs (
@@ -77,13 +89,86 @@ db.exec(`
     FOREIGN KEY (client_id) REFERENCES clients(id)
   );
 
+  CREATE TABLE IF NOT EXISTS model_metrics (
+    id TEXT PRIMARY KEY,
+    model_id TEXT NOT NULL,
+    provider_name TEXT NOT NULL,
+    avg_latency_ms REAL DEFAULT 0,
+    success_rate REAL DEFAULT 1.0,
+    cost_per_1k_input REAL DEFAULT 0,
+    cost_per_1k_output REAL DEFAULT 0,
+    context_length INTEGER DEFAULT 4096,
+    supports_vision INTEGER DEFAULT 0,
+    supports_tools INTEGER DEFAULT 0,
+    total_requests INTEGER DEFAULT 0,
+    total_errors INTEGER DEFAULT 0,
+    score REAL DEFAULT 0.5,
+    updated_at INTEGER DEFAULT 0,
+    UNIQUE(model_id, provider_name)
+  );
+
+  CREATE TABLE IF NOT EXISTS metrics (
+    id TEXT PRIMARY KEY,
+    timestamp INTEGER NOT NULL,
+    client_id TEXT NOT NULL,
+    model TEXT NOT NULL,
+    provider_name TEXT NOT NULL,
+    tokens INTEGER NOT NULL,
+    cost REAL NOT NULL,
+    latency_ms INTEGER NOT NULL,
+    status TEXT NOT NULL,
+    FOREIGN KEY (client_id) REFERENCES clients(id)
+  );
+
   CREATE INDEX IF NOT EXISTS idx_keys_provider ON keys(provider_name);
   CREATE INDEX IF NOT EXISTS idx_keys_status ON keys(status);
   CREATE INDEX IF NOT EXISTS idx_models_provider ON models(provider_name);
   CREATE INDEX IF NOT EXISTS idx_clients_hash ON clients(hash);
   CREATE INDEX IF NOT EXISTS idx_spend_logs_client ON spend_logs(client_id);
   CREATE INDEX IF NOT EXISTS idx_spend_logs_timestamp ON spend_logs(timestamp);
+  CREATE INDEX IF NOT EXISTS idx_model_metrics_model ON model_metrics(model_id);
+  CREATE INDEX IF NOT EXISTS idx_metrics_client ON metrics(client_id);
+  CREATE INDEX IF NOT EXISTS idx_metrics_timestamp ON metrics(timestamp);
 `);
+
+// Migration: Add new columns if they don't exist
+try {
+  db.exec(`ALTER TABLE keys ADD COLUMN success_rate REAL DEFAULT 1.0`);
+} catch (e) {}
+try {
+  db.exec(`ALTER TABLE keys ADD COLUMN last_error TEXT`);
+} catch (e) {}
+try {
+  db.exec(`ALTER TABLE keys ADD COLUMN cooldown_until INTEGER DEFAULT 0`);
+} catch (e) {}
+try {
+  db.exec(`ALTER TABLE keys ADD COLUMN allowed_models TEXT`);
+} catch (e) {}
+try {
+  db.exec(`ALTER TABLE keys ADD COLUMN rpm_limit INTEGER DEFAULT 0`);
+} catch (e) {}
+try {
+  db.exec(`ALTER TABLE keys ADD COLUMN tpm_limit INTEGER DEFAULT 0`);
+} catch (e) {}
+
+try {
+  db.exec(`ALTER TABLE clients ADD COLUMN monthly_budget REAL`);
+} catch (e) {}
+try {
+  db.exec(`ALTER TABLE clients ADD COLUMN daily_budget REAL`);
+} catch (e) {}
+try {
+  db.exec(`ALTER TABLE clients ADD COLUMN hourly_budget REAL`);
+} catch (e) {}
+try {
+  db.exec(`ALTER TABLE clients ADD COLUMN tier TEXT DEFAULT 'free'`);
+} catch (e) {}
+try {
+  db.exec(`ALTER TABLE clients ADD COLUMN model_quotas TEXT`);
+} catch (e) {}
+try {
+  db.exec(`ALTER TABLE clients ADD COLUMN allowed_hours TEXT`);
+} catch (e) {}
 
 export const enc = (t) => {
   const iv = crypto.randomBytes(12);
@@ -155,7 +240,7 @@ export function getModels(providerName) {
 }
 
 export function getClients() {
-  const stmt = db.prepare('SELECT id, name, prefix, created_at as created, used, last_used as last, budget, spend, rpm_limit as rpmLimit, tpm_limit as tpmLimit FROM clients');
+  const stmt = db.prepare('SELECT id, name, prefix, created_at as created, used, last_used as last, budget, spend, rpm_limit as rpmLimit, tpm_limit as tpmLimit, monthly_budget, daily_budget, hourly_budget, tier, model_quotas, allowed_hours FROM clients');
   return stmt.all();
 }
 
@@ -177,8 +262,8 @@ export function deleteProvider(name) {
 
 export function addKey(providerName, keyData) {
   const stmt = db.prepare(`
-    INSERT INTO keys (id, provider_name, h, enc, tail, status, disabled, used, errors)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO keys (id, provider_name, h, enc, tail, status, disabled, used, errors, success_rate, last_error, cooldown_until, allowed_models, rpm_limit, tpm_limit)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `);
   stmt.run(
     keyData.id,
@@ -189,7 +274,13 @@ export function addKey(providerName, keyData) {
     keyData.status || 'unverified',
     keyData.disabled ? 1 : 0,
     keyData.used || 0,
-    keyData.errors || 0
+    keyData.errors || 0,
+    keyData.success_rate || 1.0,
+    keyData.last_error || null,
+    keyData.cooldown_until || 0,
+    keyData.allowed_models ? JSON.stringify(keyData.allowed_models) : null,
+    keyData.rpm_limit || 0,
+    keyData.tpm_limit || 0
   );
 }
 
@@ -249,13 +340,25 @@ export function saveModels(providerName, models) {
   }
 }
 
-export function addClient(name, key, hash, prefix) {
+export function addClient(name, key, hash, prefix, options = {}) {
   const id = crypto.randomUUID();
   const stmt = db.prepare(`
-    INSERT INTO clients (id, name, hash, prefix, created_at)
-    VALUES (?, ?, ?, ?, ?)
+    INSERT INTO clients (id, name, hash, prefix, created_at, monthly_budget, daily_budget, hourly_budget, tier, model_quotas, allowed_hours)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `);
-  stmt.run(id, name, hash, prefix, Date.now());
+  stmt.run(
+    id,
+    name,
+    hash,
+    prefix,
+    Date.now(),
+    options.monthly_budget || null,
+    options.daily_budget || null,
+    options.hourly_budget || null,
+    options.tier || 'free',
+    options.model_quotas ? JSON.stringify(options.model_quotas) : null,
+    options.allowed_hours ? JSON.stringify(options.allowed_hours) : null
+  );
   return { id, key };
 }
 
@@ -346,6 +449,182 @@ export { db as db_sqlite, loadToLegacy };
 
 export function getClientByHash(hash) {
   // Query directly from SQLite to ensure up-to-date data
-  const stmt = db.prepare('SELECT id, name, hash, prefix, created_at as created, used, last_used as last, budget, spend, rpm_limit as rpmLimit, tpm_limit as tpmLimit FROM clients WHERE hash = ?');
+  const stmt = db.prepare('SELECT id, name, hash, prefix, created_at as created, used, last_used as last, budget, spend, rpm_limit as rpmLimit, tpm_limit as tpmLimit, monthly_budget, daily_budget, hourly_budget, tier, model_quotas, allowed_hours FROM clients WHERE hash = ?');
   return stmt.get(hash);
+}
+
+// Model Metrics functions
+export function getModelMetrics(modelId, providerName) {
+  const stmt = db.prepare('SELECT * FROM model_metrics WHERE model_id = ? AND provider_name = ?');
+  return stmt.get(modelId, providerName);
+}
+
+export function getAllModelMetrics() {
+  const stmt = db.prepare('SELECT * FROM model_metrics');
+  return stmt.all();
+}
+
+export function updateModelMetrics(modelId, providerName, data) {
+  const stmt = db.prepare(`
+    INSERT INTO model_metrics (id, model_id, provider_name, avg_latency_ms, success_rate, cost_per_1k_input, cost_per_1k_output, context_length, supports_vision, supports_tools, total_requests, total_errors, score, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ON CONFLICT(model_id, provider_name) DO UPDATE SET
+      avg_latency_ms = excluded.avg_latency_ms,
+      success_rate = excluded.success_rate,
+      cost_per_1k_input = excluded.cost_per_1k_input,
+      cost_per_1k_output = excluded.cost_per_1k_output,
+      context_length = excluded.context_length,
+      supports_vision = excluded.supports_vision,
+      supports_tools = excluded.supports_tools,
+      total_requests = excluded.total_requests,
+      total_errors = excluded.total_errors,
+      score = excluded.score,
+      updated_at = excluded.updated_at
+  `);
+  stmt.run(
+    crypto.randomUUID(),
+    modelId,
+    providerName,
+    data.avg_latency_ms || 0,
+    data.success_rate || 1.0,
+    data.cost_per_1k_input || 0,
+    data.cost_per_1k_output || 0,
+    data.context_length || 4096,
+    data.supports_vision ? 1 : 0,
+    data.supports_tools ? 1 : 0,
+    data.total_requests || 0,
+    data.total_errors || 0,
+    data.score || 0.5,
+    Date.now()
+  );
+}
+
+export function incrementModelRequest(modelId, providerName, latency, success) {
+  const current = getModelMetrics(modelId, providerName) || {
+    total_requests: 0,
+    total_errors: 0,
+    avg_latency_ms: 0,
+    success_rate: 1.0
+  };
+
+  const newTotal = (current.total_requests || 0) + 1;
+  const newErrors = (current.total_errors || 0) + (success ? 0 : 1);
+  const newSuccessRate = (newTotal - newErrors) / newTotal;
+  const newAvgLatency = current.avg_latency_ms * 0.9 + latency * 0.1;
+
+  updateModelMetrics(modelId, providerName, {
+    total_requests: newTotal,
+    total_errors: newErrors,
+    avg_latency_ms: newAvgLatency,
+    success_rate: newSuccessRate
+  });
+}
+
+// Key Health functions
+export function updateKeyHealth(providerName, keyId, data) {
+  const stmt = db.prepare(`
+    UPDATE keys
+    SET success_rate = ?, error_count = ?, last_error = ?, cooldown_until = ?, allowed_models = ?, rpm_limit = ?, tpm_limit = ?
+    WHERE id = ? AND provider_name = ?
+  `);
+  stmt.run(
+    data.success_rate !== undefined ? data.success_rate : 1.0,
+    data.error_count !== undefined ? data.error_count : 0,
+    data.last_error || null,
+    data.cooldown_until || 0,
+    data.allowed_models ? JSON.stringify(data.allowed_models) : null,
+    data.rpm_limit || 0,
+    data.tpm_limit || 0,
+    keyId,
+    providerName
+  );
+}
+
+export function getKeyHealth(providerName, keyId) {
+  const stmt = db.prepare('SELECT * FROM keys WHERE id = ? AND provider_name = ?');
+  return stmt.get(keyId, providerName);
+}
+
+// Metrics logging
+export function logMetric(data) {
+  const stmt = db.prepare(`
+    INSERT INTO metrics (id, timestamp, client_id, model, provider_name, tokens, cost, latency_ms, status)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `);
+  stmt.run(
+    crypto.randomUUID(),
+    Date.now(),
+    data.clientId,
+    data.model,
+    data.providerName,
+    data.tokens,
+    data.cost,
+    data.latencyMs,
+    data.status
+  );
+}
+
+export function getMetrics(filters = {}) {
+  let query = 'SELECT * FROM metrics WHERE 1=1';
+  const params = [];
+
+  if (filters.clientId) {
+    query += ' AND client_id = ?';
+    params.push(filters.clientId);
+  }
+  if (filters.model) {
+    query += ' AND model = ?';
+    params.push(filters.model);
+  }
+  if (filters.providerName) {
+    query += ' AND provider_name = ?';
+    params.push(filters.providerName);
+  }
+  if (filters.from) {
+    query += ' AND timestamp >= ?';
+    params.push(filters.from);
+  }
+  if (filters.to) {
+    query += ' AND timestamp <= ?';
+    params.push(filters.to);
+  }
+
+  query += ' ORDER BY timestamp DESC LIMIT 1000';
+
+  const stmt = db.prepare(query);
+  return stmt.all(...params);
+}
+
+export function getAggregatedMetrics(filters = {}) {
+  let query = `
+    SELECT
+      model,
+      provider_name,
+      COUNT(*) as total_requests,
+      SUM(tokens) as total_tokens,
+      SUM(cost) as total_cost,
+      AVG(latency_ms) as avg_latency,
+      SUM(CASE WHEN status = 'success' THEN 1 ELSE 0 END) as success_count,
+      SUM(CASE WHEN status != 'success' THEN 1 ELSE 0 END) as error_count
+    FROM metrics WHERE 1=1
+  `;
+  const params = [];
+
+  if (filters.clientId) {
+    query += ' AND client_id = ?';
+    params.push(filters.clientId);
+  }
+  if (filters.from) {
+    query += ' AND timestamp >= ?';
+    params.push(filters.from);
+  }
+  if (filters.to) {
+    query += ' AND timestamp <= ?';
+    params.push(filters.to);
+  }
+
+  query += ' GROUP BY model, provider_name';
+
+  const stmt = db.prepare(query);
+  return stmt.all(...params);
 }

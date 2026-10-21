@@ -1,4 +1,4 @@
-import { db_legacy as db, dec, save, getKeys, getModels, saveModels, updateProviderModels, updateKey, loadToLegacy } from './store.js';
+import { db_legacy as db, dec, save, getKeys, getModels, saveModels, updateProviderModels, updateKey, loadToLegacy, updateModelMetrics, getModelMetrics } from './store.js';
 
 const SKIP = /deep-research|computer-use|live|realtime|robotics|antigravity|nano-banana|lyria|veo|imagen|aqa|omni|tts|transcri|learnlm|custom-?tools|translate|-exp$/i;
 const PRIORITY = /llama|qwen|gpt-oss|gemma|deepseek|mistral|codestral|glm|kimi|minimax|gemini|nemotron|large|pro/i;
@@ -44,6 +44,19 @@ async function listIds(p, keys) {
 }
 
 export const usable = (k) => !k.disabled && k.status !== 'nocredit' && k.status !== 'invalid';
+
+// Calculate model score based on metrics
+function calculateModelScore(metrics) {
+  if (!metrics) return 0.5;
+
+  const latencyScore = metrics.avg_latency_ms > 0 ? Math.max(0, 1 - (metrics.avg_latency_ms / 2000)) : 0.5;
+  const costScore = metrics.cost_per_1k_input > 0 ? Math.max(0, 1 - (metrics.cost_per_1k_input / 0.01)) : 0.5;
+  const qualityScore = metrics.success_rate || 0.5;
+  const reliabilityScore = qualityScore;
+
+  // Weighted scoring: speed (30%), cost (30%), quality (25%), reliability (15%)
+  return (latencyScore * 0.3) + (costScore * 0.3) + (qualityScore * 0.25) + (reliabilityScore * 0.15);
+}
 
 export async function autoScan(name, classify) {
   const p = db.providers[name];
@@ -108,10 +121,56 @@ export async function autoScan(name, classify) {
           m.err = '';
           k.status = 'valid';
           updateKey(name, k.id, { status: 'valid' });
+
+          // Update model metrics
+          const currentMetrics = getModelMetrics(id, name) || {
+            total_requests: 0,
+            total_errors: 0,
+            avg_latency_ms: 0,
+            success_rate: 1.0
+          };
+          const newTotal = (currentMetrics.total_requests || 0) + 1;
+          const newErrors = currentMetrics.total_errors || 0;
+          const newSuccessRate = (newTotal - newErrors) / newTotal;
+          const newAvgLatency = currentMetrics.avg_latency_ms * 0.9 + 500 * 0.1; // Assume 500ms for probe
+
+          updateModelMetrics(id, name, {
+            total_requests: newTotal,
+            total_errors: newErrors,
+            avg_latency_ms: newAvgLatency,
+            success_rate: newSuccessRate,
+            score: calculateModelScore({
+              avg_latency_ms: newAvgLatency,
+              success_rate: newSuccessRate,
+              cost_per_1k_input: 0
+            })
+          });
         }
         else if (r.ok === false) {
           m.ok = false;
           m.err = r.err;
+
+          // Update model metrics with error
+          const currentMetrics = getModelMetrics(id, name) || {
+            total_requests: 0,
+            total_errors: 0,
+            avg_latency_ms: 0,
+            success_rate: 1.0
+          };
+          const newTotal = (currentMetrics.total_requests || 0) + 1;
+          const newErrors = (currentMetrics.total_errors || 0) + 1;
+          const newSuccessRate = (newTotal - newErrors) / newTotal;
+
+          updateModelMetrics(id, name, {
+            total_requests: newTotal,
+            total_errors: newErrors,
+            success_rate: newSuccessRate,
+            score: calculateModelScore({
+              avg_latency_ms: currentMetrics.avg_latency_ms,
+              success_rate: newSuccessRate,
+              cost_per_1k_input: 0
+            })
+          });
         }
         else m.err = r.err;
         m.at = Date.now();

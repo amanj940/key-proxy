@@ -3,6 +3,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Key Proxy</title>
 <script src="https://cdn.jsdelivr.net/npm/i18next@23.7.6/i18next.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <style>
 :root{--bg:#f3f4f9;--card:#fff;--card2:#f6f7fb;--fg:#12141c;--mut:#6b7280;--bd:#e3e6ee;--ac:#6366f1;--ac2:#8b5cf6;--bad:#ef4444;--ok:#10b981;--warn:#f59e0b;--sh:0 12px 32px -14px rgba(30,41,59,.22)}
 @media(prefers-color-scheme:dark){:root{--bg:#090a0f;--card:#12141e;--card2:#181b29;--fg:#eceef7;--mut:#8b91a8;--bd:#232738;--sh:0 12px 32px -14px rgba(0,0,0,.7)}}
@@ -177,7 +178,10 @@ const ui=n=>UI[n]||(UI[n]={tab:'keys',f:'all',q:'',all:false});
 const COL={groq:'#f55036',openrouter:'#7c3aed',gemini:'#2563eb',cerebras:'#0ea5e9',mistral:'#f59e0b',sambanova:'#ea580c',nvidia:'#16a34a',xai:'#111827',fireworks:'#dc2626',huggingface:'#eab308'};
 const color=n=>COL[n]||`hsl(${[...n].reduce((a,c)=>a*31+c.charCodeAt(0),7)%360} 62% 48%)`;
 async function api(m,p,b){
-  const r=await fetch('/admin/api'+p,{method:m,headers:{'Content-Type':'application/json'},body:b?JSON.stringify(b):undefined});
+  const token = new URLSearchParams(window.location.search).get('token');
+  const headers = {'Content-Type': 'application/json'};
+  if (token) headers['x-admin-token'] = token;
+  const r=await fetch('/admin/api'+p,{method:m,headers,body:b?JSON.stringify(b):undefined});
   if(r.status===401||r.status===403)throw new Error('Denied: Open the panel from http://127.0.0.1:8787/admin');
   return r.json();
 }
@@ -327,8 +331,67 @@ async function render(){
 
   app.append(h('section',{class:'card'},h('h2',{},window.t('providers.title')),h('p',{class:'sub'},window.t('providers.subtitle')),
     ...(withKeys.length?withKeys.map(provider):[h('p',{class:'mut'},window.t('providers.noKeys'))]),
-    without.length?h('details',{style:'margin-top:12px'},h('summary',{class:'mut'},`${window.t('providers.withoutKeys')} (${without.length})`),
+    without.length?h('details',{style:'margin-top:12px'},h('summary',{class:'mut'},window.t('providers.withoutKeys')+' ('+without.length+')'),
       h('div',{class:'row'},...without.map(p=>h('span',{class:'pill'},p.name)))):null));
+
+  // Analytics Section
+  app.append(h('section',{class:'card'},h('h2',{},'Analytics'),h('p',{class:'sub'},'Usage metrics and performance data'),
+    h('div',{id:'analytics-loading'},'Loading analytics...'),
+    h('div',{id:'analytics-content',hidden:true},
+      h('div',{class:'row'},h('b',{},'Total Requests: '),h('span',{},String(S.metrics?.total_requests||0))),
+      h('div',{class:'row'},h('b',{},'Total Cost: '),h('span',{},'$'+(S.metrics?.total_cost||0).toFixed(2))),
+      h('div',{class:'row'},h('b',{},'Avg Latency: '),h('span',{},String(Math.round(S.metrics?.avg_latency||0))+'ms')),
+      h('div',{class:'row'},h('b',{},'Success Rate: '),h('span',{},String(Math.round((S.metrics?.success_rate||0)*100))+'%')),
+      h('div',{style:'margin-top:20px'}),
+      h('canvas',{id:'usageChart',style:'max-height:300px'}),
+      h('div',{style:'margin-top:20px'}),
+      h('h3',{},'Top Models by Usage'),
+      h('ul',{},...(S.metrics?.top_models||[]).map(m=>h('li',{},h('code',{},m.model),' - '+m.total_requests+' requests'))),
+      h('div',{style:'margin-top:20px'}),
+      h('h3',{},'Top Providers by Usage'),
+      h('ul',{},...(S.metrics?.top_providers||[]).map(p=>h('li',{},h('code',{},p.provider_name),' - '+p.total_requests+' requests'))
+    )
+  ));
+
+  // Load analytics data
+  (async()=>{
+    try{
+      const metrics=await api('GET','/metrics');
+      const total=metrics.metrics.reduce((a,m)=>a+m.total_requests,0);
+      const cost=metrics.metrics.reduce((a,m)=>a+m.total_cost,0);
+      const avgLat=metrics.metrics.reduce((a,m)=>a+m.avg_latency,0)/metrics.metrics.length||0;
+      const successRate=metrics.metrics.reduce((a,m)=>a+m.success_count,0)/total||0;
+      const topModels=[...metrics.metrics].sort((a,b)=>b.total_requests-a.total_requests).slice(0,5);
+      const topProviders=[...metrics.metrics].sort((a,b)=>b.total_requests-a.total_requests).slice(0,5);
+
+      S.metrics={total_requests:total,total_cost:cost,avg_latency:avgLat,success_rate:successRate,top_models:topModels,top_providers:topProviders};
+      $('#analytics-loading').hidden=true;
+      $('#analytics-content').hidden=false;
+
+      // Create chart
+      const ctx=$('#usageChart').getContext('2d');
+      new Chart(ctx,{
+        type:'bar',
+        data:{
+          labels:topModels.map(m=>m.model),
+          datasets:[{
+            label:'Requests',
+            data:topModels.map(m=>m.total_requests),
+            backgroundColor:'rgba(99,102,241,0.6)',
+            borderColor:'rgba(99,102,241,1)',
+            borderWidth:1
+          }]
+        },
+        options:{
+          responsive:true,
+          plugins:{legend:{display:false}},
+          scales:{y:{beginAtZero:true}}
+        }
+      });
+    }catch(e){
+      $('#analytics-loading').textContent='Failed to load analytics: '+e.message;
+    }
+  })();
 
   const cn=h('input',{placeholder:window.t('advanced.name')}),cu=h('input',{placeholder:window.t('advanced.baseUrl')}),cm=h('input',{placeholder:window.t('advanced.defaultModel')});
   const ab=h('button',{},window.t('advanced.add'));ab.onclick=()=>busy(ab,'…',()=>api('PUT','/providers/'+cn.value.trim().toLowerCase(),{baseUrl:cu.value,defaultModel:cm.value}));
