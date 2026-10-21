@@ -754,18 +754,11 @@ app.get('/v1/models', (_, res) => {
 
 const port = process.env.PORT || 8787;
 const host = process.env.HOST || '127.0.0.1';
-const adminToken = process.env.ADMIN_TOKEN || '';
 
-// التحقق: إذا كان HOST عاماً، يجب وجود ADMIN_TOKEN
-if (!['127.0.0.1', 'localhost', '::1'].includes(host)) {
-  if (!adminToken || adminToken.length < 32) {
-    console.error('❌ خطأ: HOST=' + host + ' يتطلب ADMIN_TOKEN (32+ حرف).');
-    process.exit(1);
-  }
-  console.log('✅ HOST=' + host + ' مع ADMIN_TOKEN (الوضع العام).');
-}
 app.listen(port, host, (e) => {
   if (e) { console.error('listen failed:', e.message); process.exit(1); }
   console.log(`key-proxy: http://${host}:${port}/admin`);
+  console.log(`Login: http://${host}:${port}/login.html`);
+  console.log(`Register: http://${host}:${port}/register.html`);
 });
 startAuto(classify);
