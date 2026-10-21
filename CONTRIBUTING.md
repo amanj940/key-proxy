@@ -1,6 +1,6 @@
-# Contributing to Key Proxy
+# Contributing to Kos Proxy
 
-Thanks for your interest in contributing to Key Proxy!
+Thanks for your interest in contributing to Kos Proxy!
 
 ## How to Contribute
 

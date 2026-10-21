@@ -2,7 +2,7 @@
   "translation": {
     "pages": {
       "login": {
-        "title": "Sign in - Key Proxy",
+        "title": "Sign in - Kos Proxy",
         "subtitle": "Sign in",
         "username": "Username",
         "usernamePlaceholder": "Enter your username",
@@ -17,7 +17,7 @@
         "errorPrefix": "An error occurred: "
       },
       "register": {
-        "title": "Create account - Key Proxy",
+        "title": "Create account - Kos Proxy",
         "subtitle": "Create an account",
         "username": "Username",
         "usernamePlaceholder": "Choose a unique username",
@@ -37,7 +37,7 @@
         "errorPrefix": "An error occurred: "
       },
       "home": {
-        "title": "Key Proxy - Key Management",
+        "title": "Kos Proxy - Key Management",
         "subtitle": "Easily add your API keys",
         "authRequired": "Sign in to add API keys",
         "login": "Sign in",
@@ -60,7 +60,7 @@
       }
     },
     "admin": {
-      "title": "Key Proxy",
+      "title": "Kos Proxy",
       "subtitle": "Manage providers, projects and usage"
     },
     "dashboard": {

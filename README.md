@@ -1,4 +1,4 @@
-# Key Proxy
+# Kos Proxy
 
 A smart AI gateway for managing multiple LLM provider keys in one place with OpenAI-compatible interface, automatic key rotation, cost tracking, and rate limiting.
 

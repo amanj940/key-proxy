@@ -3,37 +3,42 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Key Proxy - لوحة إضافة المفاتيح</title>
+  <title>Kos Proxy - لوحة إضافة المفاتيح</title>
   <style>
     :root {
-      --bg: #f3f4f9;
+      --bg: #fbf9f7;
       --card: #fff;
       --fg: #12141c;
       --mut: #6b7280;
       --bd: #e3e6ee;
-      --ac: #6366f1;
-      --ac2: #8b5cf6;
+      --ac: #ed1c24;
+      --ac2: #b51224;
+      --yellow: #f4c900;
       --sh: 0 12px 32px -14px rgba(30, 41, 59, 0.22);
     }
     @media (prefers-color-scheme: dark) {
       :root {
-        --bg: #090a0f;
+        --bg: #171311;
         --card: #12141e;
         --card2: #181b29;
         --fg: #eceef7;
         --mut: #8b91a8;
-        --bd: #232738;
+        --bd: #40362f;
+        --ac: #ff4b4b;
+        --ac2: #d51e31;
+        --yellow: #ffdf42;
         --sh: 0 12px 32px -14px rgba(0, 0, 0, 0.7);
       }
     }
     * { box-sizing: border-box; }
+    body::before { content: ""; position: fixed; z-index: 5; inset: 0 0 auto; height: 7px; background: linear-gradient(to bottom, #ed1c24 0 33.33%, #fff 33.33% 66.66%, #00843d 66.66%); }
     body {
       margin: 0;
       font: 15px/1.5 "Segoe UI", system-ui, sans-serif;
       color: var(--fg);
       min-height: 100vh;
-      background: radial-gradient(1100px 480px at 85% -10%, rgba(99, 102, 241, 0.2), transparent),
-                  radial-gradient(800px 380px at 0% 0%, rgba(139, 92, 246, 0.14), transparent),
+      background: radial-gradient(1100px 480px at 85% -10%, rgba(237, 28, 36, 0.12), transparent),
+          radial-gradient(800px 380px at 0% 0%, rgba(244, 201, 0, 0.14), transparent),
                   var(--bg);
     }
     .wrap {
@@ -57,6 +62,7 @@
       background-clip: text;
       color: transparent;
     }
+    .brand-sun { color: var(--yellow); -webkit-text-fill-color: var(--yellow); }
     .subtitle {
       color: var(--mut);
       margin-bottom: 30px;
@@ -76,11 +82,11 @@
     }
     textarea:focus {
       border-color: var(--ac);
-      box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.2);
+      box-shadow: 0 0 0 3px rgba(237, 28, 36, 0.16);
     }
     textarea.drag {
       border-color: var(--ac);
-      background: rgba(99, 102, 241, 0.08);
+      background: rgba(237, 28, 36, 0.07);
     }
     button {
       border: 0;
@@ -91,7 +97,7 @@
       font-weight: 600;
       color: #fff;
       background: linear-gradient(135deg, var(--ac), var(--ac2));
-      box-shadow: 0 6px 16px -8px rgba(99, 102, 241, 0.8);
+      box-shadow: 0 6px 16px -8px rgba(237, 28, 36, 0.48);
       transition: transform 0.1s, opacity 0.15s;
       margin-top: 15px;
     }
@@ -142,7 +148,7 @@
       animation: in 0.25s;
     }
     .toast.ok {
-      border-right-color: #10b981;
+      border-right-color: #00843d;
     }
     .toast.bad {
       border-right-color: #ef4444;
@@ -180,7 +186,7 @@
   <button id="languageToggle" class="language-toggle" type="button">English</button>
   <div class="wrap">
     <div class="card">
-      <h1>🔑 Key Proxy</h1>
+      <h1><span class="brand-sun" aria-hidden="true">☀</span> Kos Proxy</h1>
       <p class="subtitle" data-i18n="home.subtitle">أضف مفاتيح API الخاصة بك بسهولة</p>
       
       <div id="authRequired" style="text-align:center; padding:40px 20px;">

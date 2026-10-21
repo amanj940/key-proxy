@@ -2,7 +2,7 @@
   "translation": {
     "pages": {
       "login": {
-        "title": "تسجيل الدخول - Key Proxy",
+        "title": "تسجيل الدخول - Kos Proxy",
         "subtitle": "تسجيل الدخول",
         "username": "اسم المستخدم",
         "usernamePlaceholder": "أدخل اسم المستخدم",
@@ -17,7 +17,7 @@
         "errorPrefix": "حدث خطأ: "
       },
       "register": {
-        "title": "إنشاء حساب - Key Proxy",
+        "title": "إنشاء حساب - Kos Proxy",
         "subtitle": "إنشاء حساب جديد",
         "username": "اسم المستخدم",
         "usernamePlaceholder": "اختر اسم مستخدم فريد",
@@ -37,7 +37,7 @@
         "errorPrefix": "حدث خطأ: "
       },
       "home": {
-        "title": "Key Proxy - لوحة إضافة المفاتيح",
+        "title": "Kos Proxy - لوحة إضافة المفاتيح",
         "subtitle": "أضف مفاتيح API الخاصة بك بسهولة",
         "authRequired": "يجب تسجيل الدخول لإضافة مفاتيح API",
         "login": "تسجيل الدخول",
@@ -60,7 +60,7 @@
       }
     },
     "admin": {
-      "title": "Key Proxy",
+      "title": "Kos Proxy",
       "subtitle": "إدارة المزودين والمشاريع والاستخدام"
     },
     "dashboard": {

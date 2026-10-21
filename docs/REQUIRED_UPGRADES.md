@@ -1,4 +1,4 @@
-# التطويرات اللازمة والضرورية لتطوير Key Proxy
+# التطويرات اللازمة والضرورية لتطوير Kos Proxy
 
 ## 1. الهدف
 
@@ -7,7 +7,7 @@
 - اكتشاف النماذج المتاحة
 - رؤية الحصص المتبقية لكل نموذج
 - اختيار نموذج محدد أو auto حسب المهمة
-- استخدام key-proxy كـ gateway ذكي لا مجرد proxy بسيط
+- استخدام kos-proxy كـ gateway ذكي لا مجرد proxy بسيط
 
 ---
 
@@ -284,7 +284,7 @@ const selected = chooseBestByPolicy(quotaOk, client.routing_strategy);
 - كل مفتاح يعرف النماذج المسموح بها
 - كل نموذج لديه خطر/حصة/ميزانية
 - التطبيق يختار النموذج بحسب المهمة
-- key-proxy يكون gateway policy-aware وليس مجرد proxy
+- kos-proxy يكون gateway policy-aware وليس مجرد proxy
 
 ---
 
@@ -302,5 +302,5 @@ const selected = chooseBestByPolicy(quotaOk, client.routing_strategy);
 6. validation before request execution
 7. quota-aware auto selection
 
-هذه هي التعديلات التي ستجعله قادرًا على أن ينفذ ما تريد بالضبط: "التطبيق يختار النموذج أو يتركه لـ key-proxy حسب الحصة والسياسة".
+هذه هي التعديلات التي ستجعله قادرًا على أن ينفذ ما تريد بالضبط: "التطبيق يختار النموذج أو يتركه لـ kos-proxy حسب الحصة والسياسة".
 

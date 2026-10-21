@@ -807,7 +807,7 @@ const host = process.env.HOST || '127.0.0.1';
 
 app.listen(port, host, (e) => {
   if (e) { console.error('listen failed:', e.message); process.exit(1); }
-  console.log(`key-proxy: http://${host}:${port}/admin`);
+  console.log(`kos-proxy: http://${host}:${port}/admin`);
   console.log(`Login: http://${host}:${port}/login.html`);
   console.log(`Register: http://${host}:${port}/register.html`);
 });
