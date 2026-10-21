@@ -381,7 +381,7 @@ async function render(){
       h('ul',{},...(S.metrics?.top_models||[]).map(m=>h('li',{},h('code',{},m.model),' - '+String(m.total_requests||0)+' requests'))),
       h('div',{style:'margin-top:20px'}),
       h('h3',{},'Top Providers by Usage'),
-      h('ul',{},...(S.metrics?.top_providers||[]).map(p=>h('li',{},h('code',{},p.provider_name),' - '+String(p.total_requests)+' requests'))
+      h('ul',{},...(S.metrics?.top_providers||[]).map(p=>h('li',{},h('code',{},p.provider_name),' - '+String(p.total_requests||0)+' requests')))
     )
   ));
 
