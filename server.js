@@ -379,10 +379,26 @@ app.get('/v1/models', (_, res) => {
   });
 });
 
-const port = process.env.PORT || 8787, host = process.env.HOST || '127.0.0.1';
+const port = process.env.PORT || 8787;
+const host = process.env.HOST || '127.0.0.1';
+const adminToken = process.env.ADMIN_TOKEN || '';
+
+// التحقق: إذا كان HOST عاماً، يجب وجود ADMIN_TOKEN
 if (!['127.0.0.1', 'localhost', '::1'].includes(host)) {
-  console.error('اللوحة بلا توكن، لذلك يجب أن يكون HOST محلياً (127.0.0.1)');
-  process.exit(1);
+  if (!adminToken || adminToken.length < 32) {
+    console.error('❌ خطأ: HOST=' + host + ' يتطلب ADMIN_TOKEN (32+ حرف).');
+    process.exit(1);
+  }
+  console.log('✅ HOST=' + host + ' مع ADMIN_TOKEN (الوضع العام).');
+  
+  // حماية لوحة الإدارة بالتوكن
+  app.use('/admin', (req, res, next) => {
+    const token = req.query.token || req.headers['x-admin-token'] || '';
+    if (token !== adminToken) {
+      return res.status(401).json({ error: 'unauthorized' });
+    }
+    next();
+  });
 }
 app.listen(port, host, (e) => {
   if (e) { console.error('listen failed:', e.message); process.exit(1); }
