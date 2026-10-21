@@ -1,4 +1,4 @@
-import { getClientByHash } from './store.js';
+import { getClientByHash, verifyToken, createUser, verifyUser } from './store.js';
 import express from 'express';
 import crypto from 'node:crypto';
 import { Readable } from 'node:stream';
@@ -252,6 +252,76 @@ function incrementRateLimit(client, actualTokens = 0) {
   limits.tpd.count += actualTokens;
 }
 
+/* ---------- نظام المصادقة ---------- */
+function authMiddleware(req, res, next) {
+  const host = String(req.headers.host || '').replace(/:\d+$/, '');
+  
+  // السماح بالوصول إذا كان HOST محلياً
+  if (['127.0.0.1', 'localhost', '[::1]'].includes(host)) {
+    return next();
+  }
+  
+  // التحقق من JWT token
+  const authHeader = req.headers.authorization;
+  const token = authHeader && authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null;
+  
+  if (!token) {
+    return res.status(401).json({ error: 'No token provided' });
+  }
+  
+  const verification = verifyToken(token);
+  if (!verification.success) {
+    return res.status(401).json({ error: 'Invalid token' });
+  }
+  
+  req.user = verification.user;
+  next();
+}
+
+// API routes for authentication
+app.post('/api/auth/register', (req, res) => {
+  const { username, password } = req.body;
+  
+  if (!username || !password) {
+    return res.status(400).json({ success: false, message: 'Username and password are required' });
+  }
+  
+  if (password.length < 8) {
+    return res.status(400).json({ success: false, message: 'Password must be at least 8 characters' });
+  }
+  
+  try {
+    const user = createUser(username, password, true); // First user is admin
+    const authResult = verifyUser(username, password);
+    res.json({ success: true, token: authResult.token, user: authResult.user });
+  } catch (error) {
+    if (error.message.includes('UNIQUE constraint')) {
+      return res.status(400).json({ success: false, message: 'Username already exists' });
+    }
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+app.post('/api/auth/login', (req, res) => {
+  const { username, password } = req.body;
+  
+  if (!username || !password) {
+    return res.status(400).json({ success: false, message: 'Username and password are required' });
+  }
+  
+  const result = verifyUser(username, password);
+  res.json(result);
+});
+
+app.get('/api/auth/me', authMiddleware, (req, res) => {
+  res.json({ success: true, user: req.user });
+});
+
+app.post('/api/auth/logout', (req, res) => {
+  // JWT is stateless, just return success
+  res.json({ success: true, message: 'Logged out' });
+});
+
 /* ---------- لوحة الإدارة ---------- */
 const A = '/admin/api';
 app.use(A, (req, res, next) => {
@@ -259,11 +329,28 @@ app.use(A, (req, res, next) => {
   const adminToken = process.env.ADMIN_TOKEN || '';
   const providedToken = req.query.token || req.headers['x-admin-token'] || '';
 
-  // السماح بالوصول إذا كان HOST محلياً أو إذا تم تقديم ADMIN_TOKEN صحيح
-  if (!['127.0.0.1', 'localhost', '[::1]'].includes(host)) {
-    if (!adminToken || providedToken !== adminToken) {
-      return res.status(403).json({ error: 'forbidden host - requires valid admin token' });
+  // السماح بالوصول إذا كان HOST محلياً
+  if (['127.0.0.1', 'localhost', '[::1]'].includes(host)) {
+    return next();
+  }
+  
+  // التحقق من JWT token (طريقة جديدة)
+  const authHeader = req.headers.authorization;
+  const jwtToken = authHeader && authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null;
+  
+  if (jwtToken) {
+    const verification = verifyToken(jwtToken);
+    if (verification.success) {
+      req.user = verification.user;
+      const o = req.headers.origin;
+      if (o && new URL(o).host !== req.headers.host) return res.status(403).json({ error: 'forbidden origin' });
+      return next();
     }
+  }
+  
+  // التحقق من ADMIN_TOKEN (طريقة قديمة للتوافق)
+  if (!adminToken || providedToken !== adminToken) {
+    return res.status(403).json({ error: 'forbidden host - requires valid admin token' });
   }
   const o = req.headers.origin;
   if (o && new URL(o).host !== req.headers.host) return res.status(403).json({ error: 'forbidden origin' });
@@ -274,11 +361,26 @@ app.use('/admin', (req, res, next) => {
   const adminToken = process.env.ADMIN_TOKEN || '';
   const providedToken = req.query.token || req.headers['x-admin-token'] || '';
 
-  // السماح بالوصول إذا كان HOST محلياً أو إذا تم تقديم ADMIN_TOKEN صحيح
-  if (!['127.0.0.1', 'localhost', '[::1]'].includes(host)) {
-    if (!adminToken || providedToken !== adminToken) {
-      return res.status(403).json({ error: 'forbidden host - requires valid admin token' });
+  // السماح بالوصول إذا كان HOST محلياً
+  if (['127.0.0.1', 'localhost', '[::1]'].includes(host)) {
+    return next();
+  }
+  
+  // التحقق من JWT token (طريقة جديدة)
+  const authHeader = req.headers.authorization;
+  const jwtToken = authHeader && authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null;
+  
+  if (jwtToken) {
+    const verification = verifyToken(jwtToken);
+    if (verification.success) {
+      req.user = verification.user;
+      return next();
     }
+  }
+  
+  // التحقق من ADMIN_TOKEN (طريقة قديمة للتوافق)
+  if (!adminToken || providedToken !== adminToken) {
+    return res.status(403).json({ error: 'forbidden host - requires valid admin token' });
   }
   next();
 }, express.static(fileURLToPath(new URL('./public', import.meta.url)), { index: 'admin.html' }));
@@ -286,6 +388,16 @@ app.use('/admin', (req, res, next) => {
 // الصفحة الرئيسية - إضافة مفاتيح
 app.get('/', (req, res) => {
   res.sendFile(fileURLToPath(new URL('./public/index.html', import.meta.url)));
+});
+
+// صفحة تسجيل الدخول
+app.get('/login.html', (req, res) => {
+  res.sendFile(fileURLToPath(new URL('./public/login.html', import.meta.url)));
+});
+
+// صفحة إنشاء حساب
+app.get('/register.html', (req, res) => {
+  res.sendFile(fileURLToPath(new URL('./public/register.html', import.meta.url)));
 });
 app.use('/locales', express.static(fileURLToPath(new URL('./locales', import.meta.url))));
 

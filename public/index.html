@@ -185,15 +185,22 @@
     </div>
     
     <div class="admin-link">
-      <a href="/admin" + (ADMIN_TOKEN ? '?token=' + ADMIN_TOKEN : '')>لوحة الإدارة الكاملة →</a>
+      <a href="/admin">لوحة الإدارة الكاملة →</a>
+    </div>
+    <div class="admin-link">
+      <a href="/login.html">تسجيل الدخول / إنشاء حساب →</a>
     </div>
   </div>
   
   <div id="toasts"></div>
 
   <script>
-    function getAdminToken() {
-      // Try URL parameter first
+    function getAuthToken() {
+      // Try JWT token from localStorage first
+      const jwtToken = localStorage.getItem('keyproxy_token');
+      if (jwtToken) return jwtToken;
+      
+      // Try URL parameter (old method for compatibility)
       const urlToken = new URLSearchParams(window.location.search).get('token');
       if (urlToken) return urlToken;
       
@@ -208,15 +215,15 @@
       const textarea = document.getElementById('keysInput');
       const btn = document.getElementById('addKeysBtn');
       const results = document.getElementById('results');
-      const ADMIN_TOKEN = getAdminToken();
+      const TOKEN = getAuthToken();
       
       if (!textarea.value.trim()) {
         toast('الرجاء إدخال مفاتيح أولاً', 'bad');
         return;
       }
       
-      if (!ADMIN_TOKEN) {
-        toast('مطلوب توكن admin. أدخله في الحقل أعلاه أو أضف ?token=YOUR_TOKEN إلى الرابط', 'bad');
+      if (!TOKEN) {
+        toast('مطلوب تسجيل الدخول. <a href="/login.html">اضغط هنا</a>', 'bad');
         return;
       }
       
@@ -224,9 +231,22 @@
       btn.textContent = 'جاري المعالجة...';
       
       try {
-        const response = await fetch('/admin/api/keys/smart?token=' + ADMIN_TOKEN, {
+        const headers = { 'Content-Type': 'application/json' };
+        
+        // Check if it's a JWT token (starts with eyJ)
+        if (TOKEN.startsWith('eyJ')) {
+          headers['Authorization'] = 'Bearer ' + TOKEN;
+        } else {
+          // Old method with query parameter
+        }
+        
+        const url = TOKEN.startsWith('eyJ') 
+          ? '/admin/api/keys/smart'
+          : '/admin/api/keys/smart?token=' + TOKEN;
+        
+        const response = await fetch(url, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers,
           body: JSON.stringify({ text: textarea.value })
         });
         
@@ -274,10 +294,18 @@
     function toast(msg, kind = '') {
       const el = document.createElement('div');
       el.className = 'toast ' + kind;
-      el.textContent = msg;
+      el.innerHTML = msg;
       document.getElementById('toasts').appendChild(el);
       setTimeout(() => el.remove(), kind === 'bad' ? 7000 : 3800);
     }
+    
+    // Check authentication on load
+    window.addEventListener('DOMContentLoaded', () => {
+      const jwtToken = localStorage.getItem('keyproxy_token');
+      if (jwtToken) {
+        document.getElementById('tokenSection').hidden = true;
+      }
+    });
     
     // Drag and drop support
     const textarea = document.getElementById('keysInput');

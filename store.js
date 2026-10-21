@@ -3,10 +3,17 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import Database from 'better-sqlite3';
 import 'dotenv/config';
+import bcrypt from 'bcryptjs';
+import jwt from 'jsonwebtoken';
 
 const DB_PATH = process.env.DB_PATH || './data/key-proxy.db';
 const MK = Buffer.from(process.env.MASTER_KEY || '', 'hex');
 if (MK.length !== 32) throw new Error('MASTER_KEY must be 64 hex chars (openssl rand -hex 32)');
+
+const JWT_SECRET = process.env.JWT_SECRET || 'change-this-secret-in-production';
+if (JWT_SECRET === 'change-this-secret-in-production') {
+  console.warn('⚠️  WARNING: Using default JWT_SECRET. Set JWT_SECRET environment variable in production!');
+}
 
 // Initialize SQLite
 const db = new Database(DB_PATH);
@@ -130,6 +137,44 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_metrics_client ON metrics(client_id);
   CREATE INDEX IF NOT EXISTS idx_metrics_timestamp ON metrics(timestamp);
 `);
+
+// Users table for authentication
+db.exec(`
+  CREATE TABLE IF NOT EXISTS users (
+    id TEXT PRIMARY KEY,
+    username TEXT UNIQUE NOT NULL,
+    password_hash TEXT NOT NULL,
+    created_at INTEGER NOT NULL,
+    is_admin INTEGER DEFAULT 0
+  );
+`);
+
+db.exec(`
+  CREATE INDEX IF NOT EXISTS idx_users_username ON users(username);
+`);
+
+// Migration: Add users table if it doesn't exist
+try {
+  const userCount = db.prepare('SELECT COUNT(*) as count FROM users').get();
+  console.log('✅ Users table exists with', userCount.count, 'users');
+} catch (error) {
+  if (error.message.includes('no such table')) {
+    console.log('⚠️  Users table missing, creating...');
+    db.exec(`
+      CREATE TABLE users (
+        id TEXT PRIMARY KEY,
+        username TEXT UNIQUE NOT NULL,
+        password_hash TEXT NOT NULL,
+        created_at INTEGER NOT NULL,
+        is_admin INTEGER DEFAULT 0
+      );
+    `);
+    db.exec('CREATE INDEX idx_users_username ON users(username)');
+    console.log('✅ Users table created');
+  } else {
+    console.error('❌ Error checking users table:', error.message);
+  }
+}
 
 // Migration: Add new columns if they don't exist
 try {
@@ -461,6 +506,63 @@ export function getClientByHash(hash) {
   // Query directly from SQLite to ensure up-to-date data
   const stmt = db.prepare('SELECT id, name, hash, prefix, created_at as created, used, last_used as last, budget, spend, rpm_limit as rpmLimit, tpm_limit as tpmLimit, monthly_budget, daily_budget, hourly_budget, tier, model_quotas, allowed_hours FROM clients WHERE hash = ?');
   return stmt.get(hash);
+}
+
+// User authentication functions
+export function createUser(username, password, isAdmin = false) {
+  const id = crypto.randomUUID();
+  const passwordHash = bcrypt.hashSync(password, 10);
+  const stmt = db.prepare(`
+    INSERT INTO users (id, username, password_hash, created_at, is_admin)
+    VALUES (?, ?, ?, ?, ?)
+  `);
+  stmt.run(id, username, passwordHash, Date.now(), isAdmin ? 1 : 0);
+  return { id, username, isAdmin };
+}
+
+export function verifyUser(username, password) {
+  const stmt = db.prepare('SELECT * FROM users WHERE username = ?');
+  const user = stmt.get(username);
+  
+  if (!user) {
+    return { success: false, message: 'User not found' };
+  }
+  
+  const isValid = bcrypt.compareSync(password, user.password_hash);
+  
+  if (!isValid) {
+    return { success: false, message: 'Invalid password' };
+  }
+  
+  const token = jwt.sign(
+    { userId: user.id, username: user.username, isAdmin: user.is_admin },
+    JWT_SECRET,
+    { expiresIn: '7d' }
+  );
+  
+  return { 
+    success: true, 
+    token, 
+    user: { 
+      id: user.id, 
+      username: user.username, 
+      isAdmin: user.is_admin === 1 
+    } 
+  };
+}
+
+export function verifyToken(token) {
+  try {
+    const decoded = jwt.verify(token, JWT_SECRET);
+    return { success: true, user: decoded };
+  } catch (error) {
+    return { success: false, message: 'Invalid token' };
+  }
+}
+
+export function getUserById(userId) {
+  const stmt = db.prepare('SELECT id, username, is_admin, created_at FROM users WHERE id = ?');
+  return stmt.get(userId);
 }
 
 // Model Metrics functions

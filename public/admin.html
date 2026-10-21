@@ -91,6 +91,7 @@ code{direction:ltr;unicode-bidi:embed;word-break:break-all;font-family:ui-monosp
     <div class="logo">🔑</div>
     <h1 id="title">Key Proxy<small id="subtitle">Loading...</small></h1>
     <button id="langToggle" class="ghost sm" style="margin-left:auto">🇺🇸</button>
+    <button id="logoutBtn" class="ghost sm" onclick="logout()" style="margin-right:10px" hidden>🚪 Logout</button>
     <span id="scan"></span>
   </div>
   <div id="tokenSection" style="margin:15px 0;" hidden>
@@ -183,15 +184,34 @@ const ui=n=>UI[n]||(UI[n]={tab:'keys',f:'all',q:'',all:false});
 const COL={groq:'#f55036',openrouter:'#7c3aed',gemini:'#2563eb',cerebras:'#0ea5e9',mistral:'#f59e0b',sambanova:'#ea580c',nvidia:'#16a34a',xai:'#111827',fireworks:'#dc2626',huggingface:'#eab308'};
 const color=n=>COL[n]||`hsl(${[...n].reduce((a,c)=>a*31+c.charCodeAt(0),7)%360} 62% 48%)`;
 async function api(m,p,b){
-  let token = new URLSearchParams(window.location.search).get('token');
+  let token = localStorage.getItem('keyproxy_token');
+  
+  if (!token) {
+    token = new URLSearchParams(window.location.search).get('token');
+  }
+  
   if (!token) {
     const tokenInput = document.getElementById('adminTokenInput');
     if (tokenInput) token = tokenInput.value;
   }
+  
   const headers = {'Content-Type': 'application/json'};
-  if (token) headers['x-admin-token'] = token;
+  
+  // Check if it's a JWT token (starts with eyJ)
+  if (token && token.startsWith('eyJ')) {
+    headers['Authorization'] = 'Bearer ' + token;
+  } else if (token) {
+    headers['x-admin-token'] = token;
+  }
+  
   const r=await fetch('/admin/api'+p,{method:m,headers,body:b?JSON.stringify(b):undefined});
-  if(r.status===401||r.status===403)throw new Error('Invalid admin token. Please enter your admin token.');
+  if(r.status===401||r.status===403){
+    // Clear invalid token and redirect to login
+    localStorage.removeItem('keyproxy_token');
+    localStorage.removeItem('keyproxy_user');
+    window.location.href = '/login.html';
+    throw new Error('Authentication required. Redirecting to login...');
+  }
   return r.json();
 }
 function toast(msg,kind=''){const el=h('div',{class:'toast '+kind},msg);$('#toasts').append(el);setTimeout(()=>el.remove(),kind==='bad'?7000:3800)}
@@ -412,19 +432,21 @@ let i18nReady = false;
 initI18n().then(() => {
   i18nReady = true;
   
-  // Check if token is available (URL or localStorage)
-  const urlToken = new URLSearchParams(window.location.search).get('token');
-  const storedToken = localStorage.getItem('keyproxy-admin-token');
+  // Check if JWT token is available
+  const jwtToken = localStorage.getItem('keyproxy_token');
   
-  if (urlToken) {
-    localStorage.setItem('keyproxy-admin-token', urlToken);
-    document.getElementById('adminTokenInput').value = urlToken;
+  if (jwtToken) {
     document.getElementById('tokenSection').hidden = true;
-  } else if (storedToken) {
-    document.getElementById('adminTokenInput').value = storedToken;
-    document.getElementById('tokenSection').hidden = true;
+    document.getElementById('logoutBtn').hidden = false;
   } else {
-    document.getElementById('tokenSection').hidden = false;
+    // Check for old URL token method for compatibility
+    const urlToken = new URLSearchParams(window.location.search).get('token');
+    if (urlToken) {
+      document.getElementById('adminTokenInput').value = urlToken;
+      document.getElementById('tokenSection').hidden = false;
+    } else {
+      document.getElementById('tokenSection').hidden = false;
+    }
   }
   
   // Call initial render after i18n is ready
@@ -450,6 +472,12 @@ function saveToken() {
     document.getElementById('toasts').appendChild(el);
     setTimeout(() => el.remove(), 7000);
   }
+}
+
+function logout() {
+  localStorage.removeItem('keyproxy_token');
+  localStorage.removeItem('keyproxy_user');
+  window.location.href = '/login.html';
 }
 
 // Initial render will be called after i18n is ready
