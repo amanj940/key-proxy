@@ -93,6 +93,11 @@ code{direction:ltr;unicode-bidi:embed;word-break:break-all;font-family:ui-monosp
     <button id="langToggle" class="ghost sm" style="margin-left:auto">🇺🇸</button>
     <span id="scan"></span>
   </div>
+  <div id="tokenSection" style="margin:15px 0;" hidden>
+    <input type="password" id="adminTokenInput" placeholder="Admin Token" 
+           style="width:100%; padding:10px; border:1px solid var(--bd); border-radius:8px; background:var(--card2); color:var(--fg); outline:none;">
+    <button onclick="saveToken()" style="margin-top:10px; padding:8px 16px; font-size:13px;">حفظ التوكن</button>
+  </div>
   <div class="tiles" id="tiles"></div>
   <div id="prog" hidden><b id="barTxt">…</b><div class="barbg"><div id="bar"></div></div></div>
   <div id="app"></div>
@@ -178,11 +183,15 @@ const ui=n=>UI[n]||(UI[n]={tab:'keys',f:'all',q:'',all:false});
 const COL={groq:'#f55036',openrouter:'#7c3aed',gemini:'#2563eb',cerebras:'#0ea5e9',mistral:'#f59e0b',sambanova:'#ea580c',nvidia:'#16a34a',xai:'#111827',fireworks:'#dc2626',huggingface:'#eab308'};
 const color=n=>COL[n]||`hsl(${[...n].reduce((a,c)=>a*31+c.charCodeAt(0),7)%360} 62% 48%)`;
 async function api(m,p,b){
-  const token = new URLSearchParams(window.location.search).get('token');
+  let token = new URLSearchParams(window.location.search).get('token');
+  if (!token) {
+    const tokenInput = document.getElementById('adminTokenInput');
+    if (tokenInput) token = tokenInput.value;
+  }
   const headers = {'Content-Type': 'application/json'};
   if (token) headers['x-admin-token'] = token;
   const r=await fetch('/admin/api'+p,{method:m,headers,body:b?JSON.stringify(b):undefined});
-  if(r.status===401||r.status===403)throw new Error('Denied: Open the panel from http://127.0.0.1:8787/admin');
+  if(r.status===401||r.status===403)throw new Error('Invalid admin token. Please enter your admin token.');
   return r.json();
 }
 function toast(msg,kind=''){const el=h('div',{class:'toast '+kind},msg);$('#toasts').append(el);setTimeout(()=>el.remove(),kind==='bad'?7000:3800)}
@@ -402,9 +411,46 @@ async function render(){
 let i18nReady = false;
 initI18n().then(() => {
   i18nReady = true;
+  
+  // Check if token is available (URL or localStorage)
+  const urlToken = new URLSearchParams(window.location.search).get('token');
+  const storedToken = localStorage.getItem('keyproxy-admin-token');
+  
+  if (urlToken) {
+    localStorage.setItem('keyproxy-admin-token', urlToken);
+    document.getElementById('adminTokenInput').value = urlToken;
+    document.getElementById('tokenSection').hidden = true;
+  } else if (storedToken) {
+    document.getElementById('adminTokenInput').value = storedToken;
+    document.getElementById('tokenSection').hidden = true;
+  } else {
+    document.getElementById('tokenSection').hidden = false;
+  }
+  
   // Call initial render after i18n is ready
   render();
 });
+
+function saveToken() {
+  const token = document.getElementById('adminTokenInput').value;
+  if (token) {
+    localStorage.setItem('keyproxy-admin-token', token);
+    document.getElementById('tokenSection').hidden = true;
+    // Use the existing toast function
+    const el = document.createElement('div');
+    el.className = 'toast ok';
+    el.textContent = 'تم حفظ التوكن';
+    document.getElementById('toasts').appendChild(el);
+    setTimeout(() => el.remove(), 3800);
+    render();
+  } else {
+    const el = document.createElement('div');
+    el.className = 'toast bad';
+    el.textContent = 'الرجاء إدخال توكن';
+    document.getElementById('toasts').appendChild(el);
+    setTimeout(() => el.remove(), 7000);
+  }
+}
 
 // Initial render will be called after i18n is ready
 setInterval(()=>{if(S&&S.providers.some(p=>p.scanning)&&!document.activeElement?.matches('textarea,input,select'))render()},5000);

@@ -285,16 +285,6 @@ app.use('/admin', (req, res, next) => {
 
 // الصفحة الرئيسية - إضافة مفاتيح
 app.get('/', (req, res) => {
-  const host = String(req.headers.host || '').replace(/:\d+$/, '');
-  const adminToken = process.env.ADMIN_TOKEN || '';
-  const providedToken = req.query.token || req.headers['x-admin-token'] || '';
-
-  // السماح بالوصول إذا كان HOST محلياً أو إذا تم تقديم ADMIN_TOKEN صحيح
-  if (!['127.0.0.1', 'localhost', '[::1]'].includes(host)) {
-    if (!adminToken || providedToken !== adminToken) {
-      return res.status(403).json({ error: 'forbidden host - requires valid admin token. Add ?token=YOUR_TOKEN to the URL' });
-    }
-  }
   res.sendFile(fileURLToPath(new URL('./public/index.html', import.meta.url)));
 });
 app.use('/locales', express.static(fileURLToPath(new URL('./locales', import.meta.url))));
