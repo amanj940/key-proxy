@@ -346,10 +346,10 @@ async function render(){
       h('canvas',{id:'usageChart',style:'max-height:300px'}),
       h('div',{style:'margin-top:20px'}),
       h('h3',{},'Top Models by Usage'),
-      h('ul',{},...(S.metrics?.top_models||[]).map(m=>h('li',{},h('code',{},m.model),' - '+m.total_requests+' requests'))),
+      h('ul',{},...(S.metrics?.top_models||[]).map(m=>h('li',{},h('code',{},m.model),' - '+String(m.total_requests||0)+' requests'))),
       h('div',{style:'margin-top:20px'}),
       h('h3',{},'Top Providers by Usage'),
-      h('ul',{},...(S.metrics?.top_providers||[]).map(p=>h('li',{},h('code',{},p.provider_name),' - '+p.total_requests+' requests'))
+      h('ul',{},...(S.metrics?.top_providers||[]).map(p=>h('li',{},h('code',{},p.provider_name),' - '+String(p.total_requests)+' requests'))
     )
   ));
 
