@@ -1,0 +1,284 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Key Proxy - لوحة إضافة المفاتيح</title>
+  <style>
+    :root {
+      --bg: #f3f4f9;
+      --card: #fff;
+      --fg: #12141c;
+      --mut: #6b7280;
+      --bd: #e3e6ee;
+      --ac: #6366f1;
+      --ac2: #8b5cf6;
+      --sh: 0 12px 32px -14px rgba(30, 41, 59, 0.22);
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #090a0f;
+        --card: #12141e;
+        --card2: #181b29;
+        --fg: #eceef7;
+        --mut: #8b91a8;
+        --bd: #232738;
+        --sh: 0 12px 32px -14px rgba(0, 0, 0, 0.7);
+      }
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font: 15px/1.5 "Segoe UI", system-ui, sans-serif;
+      color: var(--fg);
+      min-height: 100vh;
+      background: radial-gradient(1100px 480px at 85% -10%, rgba(99, 102, 241, 0.2), transparent),
+                  radial-gradient(800px 380px at 0% 0%, rgba(139, 92, 246, 0.14), transparent),
+                  var(--bg);
+    }
+    .wrap {
+      max-width: 600px;
+      margin: 0 auto;
+      padding: 40px 20px;
+    }
+    .card {
+      background: var(--card);
+      border: 1px solid var(--bd);
+      border-radius: 18px;
+      padding: 30px;
+      margin: 20px 0;
+      box-shadow: var(--sh);
+    }
+    h1 {
+      margin: 0 0 10px;
+      font-size: 28px;
+      background: linear-gradient(135deg, var(--ac), var(--ac2));
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+    }
+    .subtitle {
+      color: var(--mut);
+      margin-bottom: 30px;
+    }
+    textarea {
+      width: 100%;
+      min-height: 150px;
+      background: var(--card2);
+      color: var(--fg);
+      border: 1px solid var(--bd);
+      border-radius: 12px;
+      padding: 15px;
+      font: 14px/1.6 ui-monospace, Menlo, monospace;
+      resize: vertical;
+      outline: none;
+      transition: border-color 0.15s, box-shadow 0.15s;
+    }
+    textarea:focus {
+      border-color: var(--ac);
+      box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.2);
+    }
+    textarea.drag {
+      border-color: var(--ac);
+      background: rgba(99, 102, 241, 0.08);
+    }
+    button {
+      border: 0;
+      border-radius: 12px;
+      padding: 12px 24px;
+      cursor: pointer;
+      font: inherit;
+      font-weight: 600;
+      color: #fff;
+      background: linear-gradient(135deg, var(--ac), var(--ac2));
+      box-shadow: 0 6px 16px -8px rgba(99, 102, 241, 0.8);
+      transition: transform 0.1s, opacity 0.15s;
+      margin-top: 15px;
+    }
+    button:hover {
+      transform: translateY(-1px);
+    }
+    button:active {
+      transform: none;
+    }
+    button:disabled {
+      opacity: 0.55;
+      cursor: wait;
+      transform: none;
+    }
+    .results {
+      margin-top: 20px;
+    }
+    .chip {
+      padding: 10px 15px;
+      border-radius: 10px;
+      border: 1px solid var(--bd);
+      background: var(--card2);
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      margin: 8px 0;
+    }
+    .chip.added {
+      border-color: rgba(16, 185, 129, 0.5);
+    }
+    .chip.invalid {
+      border-color: rgba(239, 68, 68, 0.5);
+    }
+    .chip.unknown {
+      border-color: rgba(245, 158, 11, 0.5);
+    }
+    .toast {
+      position: fixed;
+      bottom: 20px;
+      left: 20px;
+      background: var(--card);
+      border: 1px solid var(--bd);
+      border-right: 4px solid var(--ac);
+      padding: 15px 20px;
+      border-radius: 12px;
+      box-shadow: var(--sh);
+      max-width: 340px;
+      animation: in 0.25s;
+    }
+    .toast.ok {
+      border-right-color: #10b981;
+    }
+    .toast.bad {
+      border-right-color: #ef4444;
+    }
+    @keyframes in {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .admin-link {
+      text-align: center;
+      margin-top: 30px;
+      color: var(--mut);
+    }
+    .admin-link a {
+      color: var(--ac);
+      text-decoration: none;
+    }
+    .admin-link a:hover {
+      text-decoration: underline;
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="card">
+      <h1>🔑 Key Proxy</h1>
+      <p class="subtitle">أضف مفاتيح API الخاصة بك بسهولة</p>
+      
+      <textarea id="keysInput" placeholder="الصق مفاتيح API هنا (مفتاح لكل سطر)&#10;مثال:&#10;gsk_...&#10;sk-or-...&#10;AIza..."></textarea>
+      
+      <button id="addKeysBtn" onclick="addKeys()">إضافة المفاتيح</button>
+      
+      <div id="results" class="results"></div>
+    </div>
+    
+    <div class="admin-link">
+      <a href="/admin" + (ADMIN_TOKEN ? '?token=' + ADMIN_TOKEN : '')>لوحة الإدارة الكاملة →</a>
+    </div>
+  </div>
+  
+  <div id="toasts"></div>
+
+  <script>
+    const ADMIN_TOKEN = new URLSearchParams(window.location.search).get('token') || '';
+    
+    async function addKeys() {
+      const textarea = document.getElementById('keysInput');
+      const btn = document.getElementById('addKeysBtn');
+      const results = document.getElementById('results');
+      
+      if (!textarea.value.trim()) {
+        toast('الرجاء إدخال مفاتيح أولاً', 'bad');
+        return;
+      }
+      
+      if (!ADMIN_TOKEN) {
+        toast('مطلوب توكن admin. أضف ?token=YOUR_TOKEN إلى الرابط', 'bad');
+        return;
+      }
+      
+      btn.disabled = true;
+      btn.textContent = 'جاري المعالجة...';
+      
+      try {
+        const response = await fetch('/admin/api/keys/smart?token=' + ADMIN_TOKEN, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text: textarea.value })
+        });
+        
+        const data = await response.json();
+        
+        if (data.error) {
+          toast(data.error, 'bad');
+        } else {
+          results.innerHTML = '';
+          textarea.value = '';
+          
+          data.results.forEach(r => {
+            const chip = document.createElement('div');
+            chip.className = 'chip ' + r.status;
+            
+            const icon = {
+              added: '✅',
+              duplicate: '♻️',
+              invalid: '❌',
+              unknown: '❓'
+            }[r.status];
+            
+            const text = {
+              added: `${r.provider} · …${r.tail} ${r.verified ? '(مُحقق)' : '(غير مُحقق)'}`,
+              duplicate: `…${r.tail} مكرر في ${r.provider}`,
+              invalid: `…${r.tail} غير صالح ${r.provider}`,
+              unknown: `…${r.tail} غير معروف`
+            }[r.status];
+            
+            chip.innerHTML = `<span>${icon}</span><span>${text}</span>`;
+            results.appendChild(chip);
+          });
+          
+          const added = data.results.filter(r => r.status === 'added').length;
+          toast(`تم إضافة ${added} مفتاح بنجاح`, 'ok');
+        }
+      } catch (error) {
+        toast('حدث خطأ: ' + error.message, 'bad');
+      }
+      
+      btn.disabled = false;
+      btn.textContent = 'إضافة المفاتيح';
+    }
+    
+    function toast(msg, kind = '') {
+      const el = document.createElement('div');
+      el.className = 'toast ' + kind;
+      el.textContent = msg;
+      document.getElementById('toasts').appendChild(el);
+      setTimeout(() => el.remove(), kind === 'bad' ? 7000 : 3800);
+    }
+    
+    // Drag and drop support
+    const textarea = document.getElementById('keysInput');
+    textarea.ondragover = (e) => {
+      e.preventDefault();
+      textarea.classList.add('drag');
+    };
+    textarea.ondragleave = () => {
+      textarea.classList.remove('drag');
+    };
+    textarea.ondrop = async (e) => {
+      e.preventDefault();
+      textarea.classList.remove('drag');
+      const file = e.dataTransfer.files[0];
+      if (file) {
+        textarea.value += (textarea.value ? '\n' : '') + await file.text();
+      }
+    };
+  </script>
+</body>
+</html>
