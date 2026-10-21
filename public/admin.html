@@ -94,10 +94,13 @@ code{direction:ltr;unicode-bidi:embed;word-break:break-all;font-family:ui-monosp
     <button id="logoutBtn" class="ghost sm" onclick="logout()" style="margin-right:10px" hidden>🚪 Logout</button>
     <span id="scan"></span>
   </div>
-  <div id="tokenSection" style="margin:15px 0;" hidden>
-    <input type="password" id="adminTokenInput" placeholder="Admin Token" 
-           style="width:100%; padding:10px; border:1px solid var(--bd); border-radius:8px; background:var(--card2); color:var(--fg); outline:none;">
-    <button onclick="saveToken()" style="margin-top:10px; padding:8px 16px; font-size:13px;">حفظ التوكن</button>
+  <div id="authRequired" style="text-align:center; padding:60px 20px;" hidden>
+    <div style="font-size:64px; margin-bottom:20px;">🔐</div>
+    <p style="color:var(--mut); margin-bottom:30px; font-size:18px;">يجب تسجيل الدخول للوصول إلى لوحة الإدارة</p>
+    <button onclick="window.location.href='/login.html'" style="width:auto; padding:15px 40px; font-size:16px;">تسجيل الدخول</button>
+    <div style="margin-top:20px;">
+      <a href="/register.html" style="color:var(--ac); text-decoration:none; font-size:14px;">إنشاء حساب جديد</a>
+    </div>
   </div>
   <div class="tiles" id="tiles"></div>
   <div id="prog" hidden><b id="barTxt">…</b><div class="barbg"><div id="bar"></div></div></div>
@@ -436,21 +439,14 @@ initI18n().then(() => {
   const jwtToken = localStorage.getItem('keyproxy_token');
   
   if (jwtToken) {
-    document.getElementById('tokenSection').hidden = true;
+    document.getElementById('authRequired').hidden = true;
     document.getElementById('logoutBtn').hidden = false;
+    render();
   } else {
-    // Check for old URL token method for compatibility
-    const urlToken = new URLSearchParams(window.location.search).get('token');
-    if (urlToken) {
-      document.getElementById('adminTokenInput').value = urlToken;
-      document.getElementById('tokenSection').hidden = false;
-    } else {
-      document.getElementById('tokenSection').hidden = false;
-    }
+    document.getElementById('authRequired').hidden = false;
+    document.getElementById('logoutBtn').hidden = true;
+    // Don't render admin panel if not authenticated
   }
-  
-  // Call initial render after i18n is ready
-  render();
 });
 
 function saveToken() {

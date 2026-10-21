@@ -171,24 +171,31 @@
       <h1>🔑 Key Proxy</h1>
       <p class="subtitle">أضف مفاتيح API الخاصة بك بسهولة</p>
       
-      <div id="tokenSection">
-        <label style="display:block; margin-bottom:10px; color:var(--mut);">Admin Token:</label>
-        <input type="password" id="tokenInput" placeholder="أدخل توكن الإدارة" 
-               style="width:100%; padding:12px; border:1px solid var(--bd); border-radius:10px; background:var(--card2); color:var(--fg); outline:none; margin-bottom:15px;">
+      <div id="authRequired" style="text-align:center; padding:40px 20px;">
+        <div style="font-size:48px; margin-bottom:20px;">🔐</div>
+        <p style="color:var(--mut); margin-bottom:20px;">يجب تسجيل الدخول لإضافة مفاتيح API</p>
+        <button onclick="window.location.href='/login.html'" style="width:auto; padding:12px 30px;">تسجيل الدخول</button>
+        <div style="margin-top:15px;">
+          <a href="/register.html" style="color:var(--ac); text-decoration:none;">إنشاء حساب جديد</a>
+        </div>
       </div>
       
-      <textarea id="keysInput" placeholder="الصق مفاتيح API هنا (مفتاح لكل سطر)&#10;مثال:&#10;gsk_...&#10;sk-or-...&#10;AIza..."></textarea>
-      
-      <button id="addKeysBtn" onclick="addKeys()">إضافة المفاتيح</button>
-      
-      <div id="results" class="results"></div>
+      <div id="authContent" hidden>
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
+          <span style="color:var(--mut); font-size:14px;">مسجل دخول</span>
+          <button onclick="logout()" style="padding:6px 12px; font-size:13px; margin:0; background:var(--card2); color:var(--fg); border:1px solid var(--bd);">تسجيل الخروج</button>
+        </div>
+        
+        <textarea id="keysInput" placeholder="الصق مفاتيح API هنا (مفتاح لكل سطر)&#10;مثال:&#10;gsk_...&#10;sk-or-...&#10;AIza..."></textarea>
+        
+        <button id="addKeysBtn" onclick="addKeys()">إضافة المفاتيح</button>
+        
+        <div id="results" class="results"></div>
+      </div>
     </div>
     
     <div class="admin-link">
       <a href="/admin">لوحة الإدارة الكاملة →</a>
-    </div>
-    <div class="admin-link">
-      <a href="/login.html">تسجيل الدخول / إنشاء حساب →</a>
     </div>
   </div>
   
@@ -196,17 +203,9 @@
 
   <script>
     function getAuthToken() {
-      // Try JWT token from localStorage first
+      // Try JWT token from localStorage
       const jwtToken = localStorage.getItem('keyproxy_token');
       if (jwtToken) return jwtToken;
-      
-      // Try URL parameter (old method for compatibility)
-      const urlToken = new URLSearchParams(window.location.search).get('token');
-      if (urlToken) return urlToken;
-      
-      // Try input field
-      const inputToken = document.getElementById('tokenInput').value;
-      if (inputToken) return inputToken;
       
       return '';
     }
@@ -223,7 +222,8 @@
       }
       
       if (!TOKEN) {
-        toast('مطلوب تسجيل الدخول. <a href="/login.html">اضغط هنا</a>', 'bad');
+        toast('مطلوب تسجيل الدخول', 'bad');
+        window.location.href = '/login.html';
         return;
       }
       
@@ -232,19 +232,9 @@
       
       try {
         const headers = { 'Content-Type': 'application/json' };
+        headers['Authorization'] = 'Bearer ' + TOKEN;
         
-        // Check if it's a JWT token (starts with eyJ)
-        if (TOKEN.startsWith('eyJ')) {
-          headers['Authorization'] = 'Bearer ' + TOKEN;
-        } else {
-          // Old method with query parameter
-        }
-        
-        const url = TOKEN.startsWith('eyJ') 
-          ? '/admin/api/keys/smart'
-          : '/admin/api/keys/smart?token=' + TOKEN;
-        
-        const response = await fetch(url, {
+        const response = await fetch('/admin/api/keys/smart', {
           method: 'POST',
           headers,
           body: JSON.stringify({ text: textarea.value })
@@ -254,6 +244,11 @@
         
         if (data.error) {
           toast(data.error, 'bad');
+          if (response.status === 401 || response.status === 403) {
+            localStorage.removeItem('keyproxy_token');
+            localStorage.removeItem('keyproxy_user');
+            window.location.href = '/login.html';
+          }
         } else {
           results.innerHTML = '';
           textarea.value = '';
@@ -294,36 +289,48 @@
     function toast(msg, kind = '') {
       const el = document.createElement('div');
       el.className = 'toast ' + kind;
-      el.innerHTML = msg;
+      el.textContent = msg;
       document.getElementById('toasts').appendChild(el);
       setTimeout(() => el.remove(), kind === 'bad' ? 7000 : 3800);
+    }
+    
+    function logout() {
+      localStorage.removeItem('keyproxy_token');
+      localStorage.removeItem('keyproxy_user');
+      window.location.reload();
     }
     
     // Check authentication on load
     window.addEventListener('DOMContentLoaded', () => {
       const jwtToken = localStorage.getItem('keyproxy_token');
       if (jwtToken) {
-        document.getElementById('tokenSection').hidden = true;
+        document.getElementById('authRequired').hidden = true;
+        document.getElementById('authContent').hidden = false;
+      } else {
+        document.getElementById('authRequired').hidden = false;
+        document.getElementById('authContent').hidden = true;
       }
     });
     
     // Drag and drop support
     const textarea = document.getElementById('keysInput');
-    textarea.ondragover = (e) => {
-      e.preventDefault();
-      textarea.classList.add('drag');
-    };
-    textarea.ondragleave = () => {
-      textarea.classList.remove('drag');
-    };
-    textarea.ondrop = async (e) => {
-      e.preventDefault();
-      textarea.classList.remove('drag');
-      const file = e.dataTransfer.files[0];
-      if (file) {
-        textarea.value += (textarea.value ? '\n' : '') + await file.text();
-      }
-    };
+    if (textarea) {
+      textarea.ondragover = (e) => {
+        e.preventDefault();
+        textarea.classList.add('drag');
+      };
+      textarea.ondragleave = () => {
+        textarea.classList.remove('drag');
+      };
+      textarea.ondrop = async (e) => {
+        e.preventDefault();
+        textarea.classList.remove('drag');
+        const file = e.dataTransfer.files[0];
+        if (file) {
+          textarea.value += (textarea.value ? '\n' : '') + await file.text();
+        }
+      };
+    }
   </script>
 </body>
 </html>
