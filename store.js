@@ -134,41 +134,44 @@ db.exec(`
 // Migration: Add new columns if they don't exist
 try {
   db.exec(`ALTER TABLE keys ADD COLUMN success_rate REAL DEFAULT 1.0`);
-} catch (e) {}
+} catch (e) { console.log('Migration: success_rate column exists or failed'); }
 try {
   db.exec(`ALTER TABLE keys ADD COLUMN last_error TEXT`);
-} catch (e) {}
+} catch (e) { console.log('Migration: last_error column exists or failed'); }
 try {
   db.exec(`ALTER TABLE keys ADD COLUMN cooldown_until INTEGER DEFAULT 0`);
-} catch (e) {}
+} catch (e) { console.log('Migration: cooldown_until column exists or failed'); }
 try {
   db.exec(`ALTER TABLE keys ADD COLUMN allowed_models TEXT`);
-} catch (e) {}
+} catch (e) { console.log('Migration: allowed_models column exists or failed'); }
 try {
   db.exec(`ALTER TABLE keys ADD COLUMN rpm_limit INTEGER DEFAULT 0`);
-} catch (e) {}
+} catch (e) { console.log('Migration: rpm_limit column exists or failed'); }
 try {
   db.exec(`ALTER TABLE keys ADD COLUMN tpm_limit INTEGER DEFAULT 0`);
-} catch (e) {}
+} catch (e) { console.log('Migration: tpm_limit column exists or failed'); }
+try {
+  db.exec(`ALTER TABLE keys ADD COLUMN error_count INTEGER DEFAULT 0`);
+} catch (e) { console.log('Migration: error_count column exists or failed'); }
 
 try {
   db.exec(`ALTER TABLE clients ADD COLUMN monthly_budget REAL`);
-} catch (e) {}
+} catch (e) { console.log('Migration: monthly_budget column exists or failed'); }
 try {
   db.exec(`ALTER TABLE clients ADD COLUMN daily_budget REAL`);
-} catch (e) {}
+} catch (e) { console.log('Migration: daily_budget column exists or failed'); }
 try {
   db.exec(`ALTER TABLE clients ADD COLUMN hourly_budget REAL`);
-} catch (e) {}
+} catch (e) { console.log('Migration: hourly_budget column exists or failed'); }
 try {
   db.exec(`ALTER TABLE clients ADD COLUMN tier TEXT DEFAULT 'free'`);
-} catch (e) {}
+} catch (e) { console.log('Migration: tier column exists or failed'); }
 try {
   db.exec(`ALTER TABLE clients ADD COLUMN model_quotas TEXT`);
-} catch (e) {}
+} catch (e) { console.log('Migration: model_quotas column exists or failed'); }
 try {
   db.exec(`ALTER TABLE clients ADD COLUMN allowed_hours TEXT`);
-} catch (e) {}
+} catch (e) { console.log('Migration: allowed_hours column exists or failed'); }
 
 export const enc = (t) => {
   const iv = crypto.randomBytes(12);
@@ -220,7 +223,14 @@ export function getProviders() {
 
 export function getKeys(providerName) {
   const stmt = db.prepare('SELECT * FROM keys WHERE provider_name = ?');
-  return stmt.all(providerName);
+  const keys = stmt.all(providerName);
+  // Ensure error_count exists on all keys for compatibility
+  return keys.map(k => ({
+    ...k,
+    error_count: k.error_count || 0,
+    success_rate: k.success_rate || 1.0,
+    cooldown_until: k.cooldown_until || 0
+  }));
 }
 
 export function getModels(providerName) {
@@ -522,22 +532,58 @@ export function incrementModelRequest(modelId, providerName, latency, success) {
 
 // Key Health functions
 export function updateKeyHealth(providerName, keyId, data) {
-  const stmt = db.prepare(`
-    UPDATE keys
-    SET success_rate = ?, error_count = ?, last_error = ?, cooldown_until = ?, allowed_models = ?, rpm_limit = ?, tpm_limit = ?
-    WHERE id = ? AND provider_name = ?
-  `);
-  stmt.run(
-    data.success_rate !== undefined ? data.success_rate : 1.0,
-    data.error_count !== undefined ? data.error_count : 0,
-    data.last_error || null,
-    data.cooldown_until || 0,
-    data.allowed_models ? JSON.stringify(data.allowed_models) : null,
-    data.rpm_limit || 0,
-    data.tpm_limit || 0,
-    keyId,
-    providerName
-  );
+  // Try-catch for migration compatibility
+  try {
+    const stmt = db.prepare(`
+      UPDATE keys
+      SET success_rate = ?, error_count = ?, last_error = ?, cooldown_until = ?, allowed_models = ?, rpm_limit = ?, tpm_limit = ?
+      WHERE id = ? AND provider_name = ?
+    `);
+    stmt.run(
+      data.success_rate !== undefined ? data.success_rate : 1.0,
+      data.error_count !== undefined ? data.error_count : 0,
+      data.last_error || null,
+      data.cooldown_until || 0,
+      data.allowed_models ? JSON.stringify(data.allowed_models) : null,
+      data.rpm_limit || 0,
+      data.tpm_limit || 0,
+      keyId,
+      providerName
+    );
+  } catch (e) {
+    // Fallback for old schema without new columns
+    try {
+      const stmt = db.prepare(`
+        UPDATE keys
+        SET success_rate = ?, last_error = ?, cooldown_until = ?, allowed_models = ?, rpm_limit = ?, tpm_limit = ?
+        WHERE id = ? AND provider_name = ?
+      `);
+      stmt.run(
+        data.success_rate !== undefined ? data.success_rate : 1.0,
+        data.last_error || null,
+        data.cooldown_until || 0,
+        data.allowed_models ? JSON.stringify(data.allowed_models) : null,
+        data.rpm_limit || 0,
+        data.tpm_limit || 0,
+        keyId,
+        providerName
+      );
+    } catch (e2) {
+      // Final fallback - update only existing columns
+      const stmt = db.prepare(`
+        UPDATE keys
+        SET success_rate = ?, last_error = ?, cooldown_until = ?
+        WHERE id = ? AND provider_name = ?
+      `);
+      stmt.run(
+        data.success_rate !== undefined ? data.success_rate : 1.0,
+        data.last_error || null,
+        data.cooldown_until || 0,
+        keyId,
+        providerName
+      );
+    }
+  }
 }
 
 export function getKeyHealth(providerName, keyId) {

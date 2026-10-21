@@ -101,7 +101,7 @@ function updateKeyAfterRequest(providerName, keyId, success, error = null) {
   const key = getKeyHealth(providerName, keyId);
   if (!key) return;
 
-  const errorCount = success ? 0 : (key.error_count || 0) + 1;
+  const errorCount = success ? 0 : ((key.error_count || 0) + 1);
   const totalRequests = (key.used || 0) + 1;
   const successCount = totalRequests - errorCount;
   const successRate = successCount / totalRequests;
@@ -112,12 +112,22 @@ function updateKeyAfterRequest(providerName, keyId, success, error = null) {
     cooldownUntil = Date.now() + 60000;
   }
 
-  updateKeyHealth(providerName, keyId, {
-    success_rate: successRate,
-    error_count: errorCount,
-    last_error: error,
-    cooldown_until: cooldownUntil
-  });
+  // Try to update with error_count, fallback if column doesn't exist
+  try {
+    updateKeyHealth(providerName, keyId, {
+      success_rate: successRate,
+      error_count: errorCount,
+      last_error: error,
+      cooldown_until: cooldownUntil
+    });
+  } catch (e) {
+    // Fallback without error_count
+    updateKeyHealth(providerName, keyId, {
+      success_rate: successRate,
+      last_error: error,
+      cooldown_until: cooldownUntil
+    });
+  }
 }
 
 // Check quotas for client
